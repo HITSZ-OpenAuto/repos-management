@@ -1,7 +1,7 @@
 #!/bin/zsh
 
 # Read .env file
-PAT = $(cat .env)
+PAT=$(cat .env)
 
 # Read the list of repositories from the file
 REPOS=$(cat repos_list.txt)

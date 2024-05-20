@@ -1,3 +1,5 @@
+hoa.moe
+.github
 CHEM1012
 AUTO3002A
 PHYS1002
