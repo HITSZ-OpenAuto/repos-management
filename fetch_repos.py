@@ -1,7 +1,7 @@
 import requests
 
 # Replace with your personal access token and organization name
-ACCESS_TOKEN = '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'
+ACCESS_TOKEN = "your_PAT_token"
 ORG_NAME = 'HITSZ-OpenAuto'
 
 def get_repos(org_name, access_token):
