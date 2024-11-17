@@ -1,7 +1,11 @@
+import os
 import requests
+from dotenv import load_dotenv
 
-# Replace with your personal access token and organization name
-ACCESS_TOKEN = "your_PAT_token"
+# Load the personal access token from the .env file
+load_dotenv()
+PERSONAL_ACCESS_TOKEN = os.getenv('PERSONAL_ACCESS_TOKEN')
+
 ORG_NAME = 'HITSZ-OpenAuto'
 
 def get_repos(org_name, access_token):
@@ -13,13 +17,16 @@ def get_repos(org_name, access_token):
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
+
+        # exclude repo named 'HITSZ-OpenAuto' .github and 'hoa-moe'
+        data = [repo for repo in data if repo['name'] != 'HITSZ-OpenAuto' and repo['name'] != '.github' and repo['name'] != 'hoa-moe']
         repos.extend(repo['name'] for repo in data)
         url = response.links.get('next', {}).get('url')
     
     return repos
 
 def main():
-    repos = get_repos(ORG_NAME, ACCESS_TOKEN)
+    repos = get_repos(ORG_NAME, PERSONAL_ACCESS_TOKEN)
     with open('repos_list.txt', 'w') as f:
         for repo in repos:
             f.write(f'{repo}\n')
