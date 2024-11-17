@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 # List of repositories
 REPOS=$(cat repos_list.txt) # repos_list.txt 需要和本脚本在同一目录下
