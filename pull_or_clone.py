@@ -20,7 +20,13 @@ def clone_or_update_repo(repo_url, target_path):
     """克隆或更新仓库"""
     if os.path.exists(target_path):
         if os.path.isdir(os.path.join(target_path, ".git")):
-            print(f"Updating repository: {repo_url}")
+            print(f"Switching to main branch and updating repository: {repo_url}")
+            try:
+                # 切换到主分支
+                subprocess.run(["git", "-C", target_path, "checkout", "main"], check=True)
+            except subprocess.CalledProcessError:
+                print(f"Failed to switch to main branch in {target_path}. Skipping update.")
+                raise
             subprocess.run(["git", "-C", target_path, "pull"], check=True)
         else:
             raise Exception(f"Invalid Git directory: {target_path}")
