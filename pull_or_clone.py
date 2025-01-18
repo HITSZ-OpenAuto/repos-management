@@ -17,24 +17,16 @@ bypass_list = ["HITSZ-OpenAuto", "hoa-moe"]
 
 
 def clone_or_update_repo(repo_url, target_path):
-    """克隆或更新仓库，并显示进度，如果有错误则停止"""
+    """克隆或更新仓库"""
     if os.path.exists(target_path):
         if os.path.isdir(os.path.join(target_path, ".git")):
             print(f"Updating repository: {repo_url}")
-            result = subprocess.run(["git", "-C", target_path, "pull"], check=True,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            print(result.stdout)
-            if result.stderr:
-                print(result.stderr)
+            subprocess.run(["git", "-C", target_path, "pull"], check=True)
         else:
             raise Exception(f"Invalid Git directory: {target_path}")
     else:
         print(f"Cloning repository: {repo_url}")
-        result = subprocess.run(["git", "clone", repo_url, target_path], check=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        print(result.stdout)
-        if result.stderr:
-            print(result.stderr)
+        subprocess.run(["git", "clone", repo_url, target_path], check=True)
 
 
 def main():
