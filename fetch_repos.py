@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 load_dotenv()
 PERSONAL_ACCESS_TOKEN = os.getenv('PERSONAL_ACCESS_TOKEN')
 
+# 替换为你的代理地址
+os.environ["HTTP_PROXY"] = "http://your_proxy:port"
+os.environ["HTTPS_PROXY"] = "http://your_proxy:port"
+
 ORG_NAME = 'HITSZ-OpenAuto'
 
 def get_repos(org_name, access_token):

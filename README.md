@@ -5,7 +5,7 @@
 - Linux
 - Git
 - [GitHub CLI](https://cli.github.com/)
-- Python 3
+- Python 3（推荐 3.9 及以上）
 
 ## 创建 Personal Access Token
 
@@ -15,9 +15,13 @@
 PERSONAL_ACCESS_TOKEN=<your_token_here>
 ```
 
+## [fetch_repos.py](./fetch_repos.py)
+
+获取所有仓库名（排除 'HITSZ-OpenAuto'、'.github' 与 'hoa-moe'）。
+
 ## [repos_list.txt](./repos_list.txt)
 
-HOA 仓库列表，**行尾序列为 LF，请在 Linux 环境下读取**。
+HOA 仓库列表，**注意行尾序列**。
 
 ## [approve-pr.sh](./approve-pr.sh)
 
@@ -30,3 +34,7 @@ HOA 仓库列表，**行尾序列为 LF，请在 Linux 环境下读取**。
 批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加/覆写 workflow 文件。
 
 如果要覆写，请将更新的内容写到 `read -r -d '' WORKFLOW_CONTENT << 'EOF'` 后面。
+
+## [pull_or_clone.py](./pull_or_clone.py)
+
+对于所有仓库，若本地有对应仓库文件夹，则拉取主分支；否则克隆仓库。可以通过 bypass_list 列表指定排除的仓库。
