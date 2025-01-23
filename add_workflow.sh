@@ -62,7 +62,7 @@ for REPO in $REPOS; do
     -f sha="$FILE_SHA"
 
   # Create a pull request
-  gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "更新触发 hoa-moe 仓库更新的 GitHub Actions workflow" -b "更新后的 workflow 文件会触发 hoa-moe 仓库的 Build Single Course workflow"
+  gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "更新触发 hoa-moe 仓库更新的 GitHub Actions workflow" -b "更新后的 workflow 文件会触发 hoa-moe 仓库的 Build Documentation workflow"
 
   echo "PR created for $REPO"
 done
