@@ -21,9 +21,9 @@ PERSONAL_ACCESS_TOKEN=<your_token_here>
 
 ## [repos_list.txt](./repos_list.txt)
 
-HOA 仓库列表，**注意行尾序列**。
+组织下所有仓库的列表，**注意行尾序列应该为 LF**。
 
-## [approve-pr.sh](./approve-pr.sh)
+## [approve_pr.sh](./approve-pr.sh)
 
 批量批准 [`repos_list.txt`](./repos_list.txt) 下所有仓库的最新 PR。
 
@@ -38,3 +38,15 @@ HOA 仓库列表，**注意行尾序列**。
 ## [pull_or_clone.py](./pull_or_clone.py)
 
 对于所有仓库，若本地有对应仓库文件夹，则拉取主分支；否则克隆仓库。可以通过 bypass_list 列表指定排除的仓库。
+
+## [collect_worktree_info.sh](./collect_worktree_info.sh)
+
+收集仓库的文件信息（包括文件名、大小、修改时间等），保存为 .json 格式的文件。
+
+## [add_licenses.py](./add_licenses.py)
+
+批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加许可证文件。
+
+## [add_secrets.py](./add_secrets.py)
+
+批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加 Secrets。
