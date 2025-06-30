@@ -1,40 +1,75 @@
-# 仓库管理脚本
+<div align="center">
 
-环境：
+# Organization Repository Management Scripts
 
-- Linux
-- Git
-- [GitHub CLI](https://cli.github.com/)
-- Python 3（推荐 3.9 及以上）
+[English](README.md) | [中文](README.zh-CN.md)
 
-## 创建 Personal Access Token
+</div>
 
-在 GitHub 网页版的 `Settings` -> `Developer settings` -> `Personal access tokens` 中创建一个 GitHub Personal Access Token，权限至少包含 `repo` 和 `workflow`。将其保存到 `.env` 文件中：
+<br>
 
-```bash
-PERSONAL_ACCESS_TOKEN=<your_token_here>
-```
+The scripts in this repository are designed to manage repositories within an organization, specifically for the HITSZ-OpenAuto organization. They facilitate tasks such as fetching repository names, approving pull requests, adding workflows, and managing licenses and secrets.
 
-## [fetch_repos.py](./fetch_repos.py)
+## Environment Requirements
 
-获取所有仓库名（排除 'HITSZ-OpenAuto'、'.github' 与 'hoa-moe'）。
+- Operating System: Linux
+- Tool Dependencies:
+  - Git
+  - [GitHub CLI](https://cli.github.com/)
+  - Python 3 (Recommended 3.9 or higher)
 
-## [repos_list.txt](./repos_list.txt)
+## Create Personal Access Token
 
-HOA 仓库列表，**注意行尾序列**。
+1. Create a Token in GitHub's web interface at `Settings` → `Developer settings` → `Personal access tokens`
 
-## [approve-pr.sh](./approve-pr.sh)
+2. Required Permissions: At least `repo` and `workflow`
 
-批量批准 [`repos_list.txt`](./repos_list.txt) 下所有仓库的最新 PR。
+3. Save to `.env` file:
 
-一般用于更新仓库的 workflow 等。
+   ```bash
+   PERSONAL_ACCESS_TOKEN=<your_token_here>
+   ```
 
-## [add_workflow.sh](./add_workflow.sh)
+## Script Documentation
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加/覆写 workflow 文件。
+### fetch_repos.py
 
-如果要覆写，请将更新的内容写到 `read -r -d '' WORKFLOW_CONTENT << 'EOF'` 后面。
+Fetch all repository names (excluding 'HITSZ-OpenAuto', '.github', and 'hoa-moe')
 
-## [pull_or_clone.py](./pull_or_clone.py)
+### repos_list.txt
 
-对于所有仓库，若本地有对应仓库文件夹，则拉取主分支；否则克隆仓库。可以通过 bypass_list 列表指定排除的仓库。
+List of all repositories in the organization
+
+- Note: Line endings should be LF (Linux newline character)
+
+### approve_pr.sh
+
+Batch approve the latest PRs for all repositories listed in [`repos_list.txt`](./repos_list.txt)
+
+- Typically used for updating repository workflows
+
+### add_workflow.sh
+
+Batch add/overwrite workflow files for all repositories listed in [`repos_list.txt`](./repos_list.txt)
+
+- If overwriting, place the updated content after `read -r -d '' WORKFLOW_CONTENT << 'EOF'`
+
+### pull_or_clone.py
+
+Perform the following for all repositories:
+
+- If the local folder exists → Pull the main branch
+- If the folder doesn't exist → Clone the repository
+- Exclude specific repositories using the `bypass_list` list
+
+### collect_worktree_info.sh
+
+Collect repository file information (including filenames, sizes, and modification times), saved as a `.json` formatted file
+
+### add_licenses.py
+
+Batch add license files to all repositories listed in [`repos_list.txt`](./repos_list.txt)
+
+### add_secrets.py
+
+Batch add Secrets to all repositories listed in [`repos_list.txt`](./repos_list.txt)
