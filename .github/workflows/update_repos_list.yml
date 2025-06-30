@@ -39,6 +39,9 @@ jobs:
 
       - name: Update Repositories List
         run: uv run scripts/fetch_repos.py
+        env:
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          ORG_NAME: HITSZ-OpenAuto
 
       - name: Commit and Push Changes
         run: |
