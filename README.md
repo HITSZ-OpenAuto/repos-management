@@ -1,65 +1,75 @@
-# 组织仓库管理脚本
+<div align="center">
 
-## 环境要求
+# Organization Repository Management Scripts
 
-- 操作系统：Linux
-- 工具依赖：
+[English](README.md) | [中文](README.zh-CN.md)
+
+</div>
+
+<br>
+
+The scripts in this repository are designed to manage repositories within an organization, specifically for the HITSZ-OpenAuto organization. They facilitate tasks such as fetching repository names, approving pull requests, adding workflows, and managing licenses and secrets.
+
+## Environment Requirements
+
+- Operating System: Linux
+- Tool Dependencies:
   - Git
   - [GitHub CLI](https://cli.github.com/)
-  - Python 3（推荐 3.9 及以上）
+  - Python 3 (Recommended 3.9 or higher)
 
-## 创建 Personal Access Token
+## Create Personal Access Token
 
-1. 在 GitHub 网页版的 `Settings` → `Developer settings` → `Personal access tokens` 中创建 Token
+1. Create a Token in GitHub's web interface at `Settings` → `Developer settings` → `Personal access tokens`
 
-2. 权限要求：至少包含 `repo` 和 `workflow`
+2. Required Permissions: At least `repo` and `workflow`
 
-3. 保存至 `.env` 文件：
+3. Save to `.env` file:
 
    ```bash
    PERSONAL_ACCESS_TOKEN=<your_token_here>
    ```
 
-## 脚本说明
+## Script Documentation
 
 ### fetch_repos.py
 
-获取所有仓库名（排除 'HITSZ-OpenAuto'、'.github' 与 'hoa-moe'）
+Fetch all repository names (excluding 'HITSZ-OpenAuto', '.github', and 'hoa-moe')
 
 ### repos_list.txt
 
-组织下所有仓库的列表
+List of all repositories in the organization
 
-- 注意：行尾序列应为 LF（Linux 换行符）
+- Note: Line endings should be LF (Linux newline character)
 
 ### approve_pr.sh
 
-批量批准 [`repos_list.txt`](./repos_list.txt) 下所有仓库的最新 PR
+Batch approve the latest PRs for all repositories listed in [`repos_list.txt`](./repos_list.txt)
 
-- 通常用于更新仓库的 workflow 等
+- Typically used for updating repository workflows
 
 ### add_workflow.sh
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加/覆写 workflow 文件
+Batch add/overwrite workflow files for all repositories listed in [`repos_list.txt`](./repos_list.txt)
 
-- 若需覆写，请将更新内容写在 `read -r -d '' WORKFLOW_CONTENT << 'EOF'` 后面
+- If overwriting, place the updated content after `read -r -d '' WORKFLOW_CONTENT << 'EOF'`
 
 ### pull_or_clone.py
 
-对所有仓库执行：
+Perform the following for all repositories:
 
-- 若本地存在对应文件夹 → 拉取主分支
-- 若不存在 → 克隆仓库
-- 可通过 `bypass_list` 列表指定排除的仓库
+- If the local folder exists → Pull the main branch
+- If the folder doesn't exist → Clone the repository
+- Exclude specific repositories using the `bypass_list` list
 
 ### collect_worktree_info.sh
 
-收集仓库文件信息（含文件名、大小、修改时间等），保存为 `.json` 格式文件
+Collect repository file information (including filenames, sizes, and modification times), saved as a `.json` formatted file
 
 ### add_licenses.py
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加许可证文件
+Batch add license files to all repositories listed in [`repos_list.txt`](./repos_list.txt)
 
 ### add_secrets.py
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加 Secrets
+Batch add Secrets to all repositories listed in [`repos_list.txt`](./repos_list.txt)
