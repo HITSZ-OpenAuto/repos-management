@@ -1,52 +1,65 @@
-# 仓库管理脚本
+# 组织仓库管理脚本
 
-环境：
+## 环境要求
 
-- Linux
-- Git
-- [GitHub CLI](https://cli.github.com/)
-- Python 3（推荐 3.9 及以上）
+- 操作系统：Linux
+- 工具依赖：
+  - Git
+  - [GitHub CLI](https://cli.github.com/)
+  - Python 3（推荐 3.9 及以上）
 
 ## 创建 Personal Access Token
 
-在 GitHub 网页版的 `Settings` -> `Developer settings` -> `Personal access tokens` 中创建一个 GitHub Personal Access Token，权限至少包含 `repo` 和 `workflow`。将其保存到 `.env` 文件中：
+1. 在 GitHub 网页版的 `Settings` → `Developer settings` → `Personal access tokens` 中创建 Token
 
-```bash
-PERSONAL_ACCESS_TOKEN=<your_token_here>
-```
+2. 权限要求：至少包含 `repo` 和 `workflow`
 
-## [fetch_repos.py](./fetch_repos.py)
+3. 保存至 `.env` 文件：
 
-获取所有仓库名（排除 'HITSZ-OpenAuto'、'.github' 与 'hoa-moe'）。
+   ```bash
+   PERSONAL_ACCESS_TOKEN=<your_token_here>
+   ```
 
-## [repos_list.txt](./repos_list.txt)
+## 脚本说明
 
-组织下所有仓库的列表，**注意行尾序列应该为 LF**。
+### fetch_repos.py
 
-## [approve_pr.sh](./approve-pr.sh)
+获取所有仓库名（排除 'HITSZ-OpenAuto'、'.github' 与 'hoa-moe'）
 
-批量批准 [`repos_list.txt`](./repos_list.txt) 下所有仓库的最新 PR。
+### repos_list.txt
 
-一般用于更新仓库的 workflow 等。
+组织下所有仓库的列表
 
-## [add_workflow.sh](./add_workflow.sh)
+- 注意：行尾序列应为 LF（Linux 换行符）
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加/覆写 workflow 文件。
+### approve_pr.sh
 
-如果要覆写，请将更新的内容写到 `read -r -d '' WORKFLOW_CONTENT << 'EOF'` 后面。
+批量批准 [`repos_list.txt`](./repos_list.txt) 下所有仓库的最新 PR
 
-## [pull_or_clone.py](./pull_or_clone.py)
+- 通常用于更新仓库的 workflow 等
 
-对于所有仓库，若本地有对应仓库文件夹，则拉取主分支；否则克隆仓库。可以通过 bypass_list 列表指定排除的仓库。
+### add_workflow.sh
 
-## [collect_worktree_info.sh](./collect_worktree_info.sh)
+批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加/覆写 workflow 文件
 
-收集仓库的文件信息（包括文件名、大小、修改时间等），保存为 .json 格式的文件。
+- 若需覆写，请将更新内容写在 `read -r -d '' WORKFLOW_CONTENT << 'EOF'` 后面
 
-## [add_licenses.py](./add_licenses.py)
+### pull_or_clone.py
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加许可证文件。
+对所有仓库执行：
 
-## [add_secrets.py](./add_secrets.py)
+- 若本地存在对应文件夹 → 拉取主分支
+- 若不存在 → 克隆仓库
+- 可通过 `bypass_list` 列表指定排除的仓库
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加 Secrets。
+### collect_worktree_info.sh
+
+收集仓库文件信息（含文件名、大小、修改时间等），保存为 `.json` 格式文件
+
+### add_licenses.py
+
+批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加许可证文件
+
+### add_secrets.py
+
+批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加 Secrets
