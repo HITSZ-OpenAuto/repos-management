@@ -2,6 +2,11 @@
 import subprocess
 import json
 import sys
+import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def cmd(cmds, cwd=None) -> bytes:
@@ -105,8 +110,13 @@ def main():
         files_data[file_path]["time"] = int(timestamp)
         files_data[file_path]["hash"] = commit_hash.decode("ascii")
 
-    # 输出
-    print(json.dumps(files_data, indent=2, ensure_ascii=False))
+    # 输出到指定的文件夹并保存为 JSON 格式
+    output_folder = ".hoa"
+    output_file = "worktree.json"
+    os.makedirs(output_folder, exist_ok=True)
+    with open(os.path.join(output_folder, output_file), "w", encoding="utf-8") as f:
+        json.dump(files_data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Worktree info saved to {os.path.join(output_folder, output_file)}")
 
 
 if __name__ == "__main__":
