@@ -13,7 +13,7 @@ TIMEZONE_HOUR=0
 generate_full_workflow_content() {
   local hour=$1
   cat << EOF
-name: Update Worktree
+name: Update Worktree and Trigger Workflow
 
 on:
   push:
@@ -84,6 +84,19 @@ jobs:
           else
             echo "No changes to commit"
           fi
+
+      - name: Trigger workflow in hoa-moe
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: \${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          REPO_NAME=\$(echo \${{ github.repository }} | cut -d'/' -f2)
+          echo \${REPO_NAME}
+          curl -X POST \\
+            -H "Accept: application/vnd.github.v3+json" \\
+            -H "Authorization: token \$GITHUB_TOKEN" \\
+            https://api.github.com/repos/HITSZ-OpenAuto/hoa-moe/actions/workflows/course.yaml/dispatches \\
+            -d '{"ref":"main","inputs": {"repo_name": "'"'\${REPO_NAME}'"'"}}'
 
 EOF
 }
