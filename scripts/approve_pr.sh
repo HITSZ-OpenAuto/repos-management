@@ -3,8 +3,9 @@
 # List of repositories
 REPOS=$(cat repos_list.txt) # repos_list.txt 需要和本脚本在同一目录下
 
-# GitHub Personal Access Token
-PAT=“这里填写你的 GitHub PAT，scope 至少需要 repo 权限”
+# Put your GitHub Personal Access Token in .env file
+# Format: PERSONAL_ACCESS_TOKEN=your_token_here
+source .env
 
 for REPO in $REPOS; do
   # Fetch the latest pull request number using GitHub CLI
