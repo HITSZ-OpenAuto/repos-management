@@ -17,9 +17,6 @@ name: Update Worktree and Trigger Workflow
 
 on:
   push:
-    branches: [ "*" ]
-
-  pull_request:
     branches: [ "main" ]
 
   schedule:
@@ -63,24 +60,12 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions"
           
-          # Get the current branch name
-          BRANCH_NAME="\${{ github.head_ref || github.ref_name }}"
-          echo "Current branch: \$BRANCH_NAME"
-          
-          # Check if we're in detached HEAD and switch to the current branch
-          if git symbolic-ref -q HEAD >/dev/null; then
-            echo "Already on a branch"
-          else
-            echo "In detached HEAD, switching to branch: \$BRANCH_NAME"
-            git checkout "\$BRANCH_NAME"
-          fi
-          
           # Add changes if any exist
           if [ -n "\$(git status --porcelain)" ]; then
             git add .hoa/worktree.json
             git commit -m "Update worktree [skip ci]"
-            git push origin "\$BRANCH_NAME"
-            echo "Worktree updated and committed to \$BRANCH_NAME"
+            git push origin main
+            echo "Worktree updated and committed to main branch"
           else
             echo "No changes to commit"
           fi
@@ -109,51 +94,90 @@ for REPO in $REPOS; do
   # Generate workflow content with current timezone hour
   WORKFLOW_CONTENT=$(generate_full_workflow_content $TIMEZONE_HOUR)
   
-  BRANCH_NAME="add-worktree-workflow"
+  BRANCH_NAME="update-worktree-workflow"
   # Get the latest commit SHA of the main branch
   MAIN_SHA=$(gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/git/ref/heads/main" -q '.object.sha')
 
   # Check if the branch already exists
-  BRANCH_EXISTS=$(gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/git/ref/heads/$BRANCH_NAME" -q '.object.sha' 2>/dev/null || echo "")
+  BRANCH_CHECK_RESULT=$(gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/git/ref/heads/$BRANCH_NAME" 2>&1)
+  BRANCH_CHECK_EXIT_CODE=$?
   
-  if [ -z "$BRANCH_EXISTS" ]; then
+  if [ $BRANCH_CHECK_EXIT_CODE -eq 0 ]; then
+    echo "Branch $BRANCH_NAME already exists, skipping branch creation"
+    BRANCH_EXISTS="true"
+  else
     echo "Creating new branch: $BRANCH_NAME"
     # Create a new branch
-    gh api -X POST \
+    CREATE_RESULT=$(gh api -X POST \
       -H "Authorization: token $PERSONAL_ACCESS_TOKEN" \
       -H "Accept: application/vnd.github.v3+json" \
       "/repos/HITSZ-OpenAuto/$REPO/git/refs" \
       -f ref="refs/heads/$BRANCH_NAME" \
-      -f sha="$MAIN_SHA"
-  else
-    echo "Branch $BRANCH_NAME already exists, skipping branch creation"
+      -f sha="$MAIN_SHA" 2>&1)
+    CREATE_EXIT_CODE=$?
+    
+    if [ $CREATE_EXIT_CODE -eq 0 ]; then
+      echo "Branch created successfully"
+      BRANCH_EXISTS="true"
+    else
+      echo "Failed to create branch: $CREATE_RESULT"
+      continue
+    fi
   fi
 
   # Get the SHA of the existing workflow file if it exists
-  # If branch exists, get file SHA from that branch; otherwise get from main or empty if doesn't exist
-  if [ -n "$BRANCH_EXISTS" ]; then
-    FILE_SHA=$(gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml?ref=$BRANCH_NAME" -q '.sha' 2>/dev/null || echo "")
+  # Try to get file SHA from the branch first, fall back to main, or use empty if doesn't exist
+  FILE_SHA=$(gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml?ref=$BRANCH_NAME" -q '.sha' 2>/dev/null || \
+             gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" -q '.sha' 2>/dev/null || \
+             echo "")
+  
+  if [ -n "$FILE_SHA" ]; then
+    echo "Found existing workflow file with SHA: $FILE_SHA"
   else
-    FILE_SHA=$(gh api -H "Authorization: token $PERSONAL_ACCESS_TOKEN" "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" -q '.sha' 2>/dev/null || echo "")
+    echo "No existing workflow file found, creating new file"
   fi
 
-  # Create or update the workflow file in the new branch
+  # Create or update the workflow file in the branch
   WORKFLOW_CONTENT_BASE64=$(echo "$WORKFLOW_CONTENT" | base64)
-  gh api -X PUT \
-    -H "Authorization: token $PERSONAL_ACCESS_TOKEN" \
-    -H "Accept: application/vnd.github.v3+json" \
-    "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" \
-    -f message="ci: add collect worktree info workflow" \
-    -f content="$WORKFLOW_CONTENT_BASE64" \
-    -f branch="$BRANCH_NAME" \
-    -f sha="$FILE_SHA"
-
-  echo "Workflow file updated for $REPO"
+  
+  if [ -n "$FILE_SHA" ]; then
+    echo "Updating existing workflow file..."
+    UPDATE_RESULT=$(gh api -X PUT \
+      -H "Authorization: token $PERSONAL_ACCESS_TOKEN" \
+      -H "Accept: application/vnd.github.v3+json" \
+      "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" \
+      -f message="ci: fix permission issue in workflow" \
+      -f content="$WORKFLOW_CONTENT_BASE64" \
+      -f branch="$BRANCH_NAME" \
+      -f sha="$FILE_SHA" 2>&1)
+  else
+    echo "Creating new workflow file..."
+    UPDATE_RESULT=$(gh api -X PUT \
+      -H "Authorization: token $PERSONAL_ACCESS_TOKEN" \
+      -H "Accept: application/vnd.github.v3+json" \
+      "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" \
+      -f message="ci: fix permission issue in workflow" \
+      -f content="$WORKFLOW_CONTENT_BASE64" \
+      -f branch="$BRANCH_NAME" 2>&1)
+  fi
+  
+  UPDATE_EXIT_CODE=$?
+  if [ $UPDATE_EXIT_CODE -eq 0 ]; then
+    echo "Workflow file updated successfully for $REPO"
+  else
+    echo "Failed to update workflow file for $REPO: $UPDATE_RESULT"
+    continue
+  fi
 
   # Create a pull request
-  gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "ci: add collect worktree info workflow" -b "更新后的 workflow 文件会生成一份 worktree 信息"
-
-  # echo "PR created for $REPO"
+  PR_RESULT=$(gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "ci: fix permission issue in workflow" -b "更新后的 workflow 文件会生成一份 worktree 信息" 2>&1)
+  PR_EXIT_CODE=$?
+  
+  if [ $PR_EXIT_CODE -eq 0 ]; then
+    echo "PR created successfully for $REPO: $PR_RESULT"
+  else
+    echo "Failed to create PR for $REPO (might already exist): $PR_RESULT"
+  fi
   
   # Increment timezone hour and reset after 23
   TIMEZONE_HOUR=$((TIMEZONE_HOUR + 1))
