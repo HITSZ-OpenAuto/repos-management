@@ -27,7 +27,6 @@ def get_repos(org_name, access_token):
             and not repo["name"].startswith("hoa-")
             and repo["name"] != "aextra"
             and not repo["name"].startswith("repos-")
-            and not repo["name"].startswith("course-")
             and not repo["name"].startswith("dev-")
         ]
         repos.extend(repo["name"] for repo in data)

@@ -1,4 +1,5 @@
 PHYS1002
+course-template
 AUTO3002A
 CHEM1012
 AUTO2005
