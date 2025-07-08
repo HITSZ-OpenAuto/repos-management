@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
     try:
-        logger.debug("run: " + " ".join(cmds))
+        logger.debug(f"run: {cmds}")
         result = subprocess.run(
             cmds,
             check=True,
@@ -28,12 +28,15 @@ def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
             # Don't exit on failure, just re-raise
             raise e
         print(f"Error executing git command: {cmds}")
-        print(f"Error output: {e.stderr.strip()}")
+        print(f"Error stdout: {e.stdout.strip()}")
+        print(f"Error stderr: {e.stderr.strip()}")
+        print(f'Error code: {e.returncode}')
+        print(f"Error message: {e}")
         sys.exit(1)
 
 
 def return_code(cmds) -> int:
-    logger.debug("test: " + " ".join(cmds))
+    logger.debug(f"test: {cmds}")
     result = subprocess.run(
         cmds,
         stdout=subprocess.DEVNULL,
