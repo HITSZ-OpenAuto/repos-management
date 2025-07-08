@@ -132,8 +132,9 @@ def collect_info_for_head_commit() -> dict:
 
 def prepare_or_checkout_to_worktree_branch(name: str):
     if return_code(["git", "show-ref", "--quiet", "--branches", name]) != 0:
-        logger.info(f"Creating new orphan worktree branch {name}")
+        logger.info(f"Creating new empty orphan worktree branch {name}")
         cmd(["git", "checkout", "--orphan", name])
+        cmd(["git", "rm", "-rf", "."])
     else:
         logger.info(f"Switching to worktree branch {name}")
         cmd(["git", "checkout", name])
