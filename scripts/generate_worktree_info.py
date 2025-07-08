@@ -131,13 +131,13 @@ def collect_info_for_head_commit() -> dict:
 
 
 def prepare_or_checkout_to_worktree_branch(name: str):
-    if return_code(["git", "show-ref", "--quiet", "--branches", name]) != 0:
+    try:
+        cmd(["git", "checkout", name], allow_fail=True)
+    except subprocess.CalledProcessError:
         logger.info(f"Creating new empty orphan worktree branch {name}")
         cmd(["git", "checkout", "--orphan", name])
         cmd(["git", "rm", "-rf", "."])
-    else:
-        logger.info(f"Switching to worktree branch {name}")
-        cmd(["git", "checkout", name])
+    logger.info(f"Switched to worktree branch {name}")
 
 
 def prepare_user_info():
