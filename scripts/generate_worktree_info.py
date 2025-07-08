@@ -32,7 +32,7 @@ def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
         print(f"Error message: {e}")
         if allow_fail:
             # Don't exit on failure, just re-raise
-            raise e
+            raise
         else:
             sys.exit(1)
 
@@ -58,7 +58,7 @@ def decode_git_ls_tree_path(content: bytes) -> str:
     if content.startswith(b'"'):
         if not content.endswith(b'"'):
             raise RuntimeError(
-                f"Invalid git ls-tree output: path ill-quoted: {content}"
+                f"Invalid git ls-tree output: path ill-quoted: `{content}`"
             )
         content = content[1:-1]
 
@@ -74,7 +74,7 @@ def decode_git_ls_tree_path(content: bytes) -> str:
         idx += 1
         if idx >= end:
             raise RuntimeError(
-                f"Invalid git ls-tree output: path ill-escaped, ending with hangling backslash: {content}"
+                f"Invalid git ls-tree output: path ill-escaped, ending with hangling backslash: `{content}`"
             )
         escaped_alpha = content[idx]
         # check octal esaped character
@@ -82,7 +82,7 @@ def decode_git_ls_tree_path(content: bytes) -> str:
             value_literal = content[idx : idx + 3]
             if idx + 3 > end or not all(is_digit_in_ascii(c) for c in value_literal):
                 raise RuntimeError(
-                    f"Invalid git ls-tree output: path ill-escaped, wrong octal escape sequence: {content}"
+                    f"Invalid git ls-tree output: path ill-escaped, wrong octal escape sequence: `{content}`"
                 )
             value = int(value_literal, 8)
             escaped_array.append(value)
@@ -94,7 +94,7 @@ def decode_git_ls_tree_path(content: bytes) -> str:
             assert isinstance(value_bytes, bytes) and len(value_bytes) == 1
         except SyntaxWarning or SyntaxError or AssertionError:
             raise RuntimeError(
-                f"Invalid git ls-tree output: path ill-escaped, wrong escaped character: {content}"
+                f"Invalid git ls-tree output: path ill-escaped, wrong escaped character: `{content}`"
             )
         escaped_array.append(ord(value_bytes))
         idx += 1
@@ -139,10 +139,10 @@ def prepare_or_checkout_to_worktree_branch(name: str):
     try:
         cmd(["git", "checkout", name], allow_fail=True)
     except subprocess.CalledProcessError:
-        logger.info(f"Creating new empty orphan worktree branch {name}")
+        logger.info(f"Creating new empty orphan worktree branch `{name}`")
         cmd(["git", "checkout", "--orphan", name])
         cmd(["git", "rm", "-rf", "."])
-    logger.info(f"Switched to worktree branch {name}")
+    logger.info(f"Switched to worktree branch `{name}`")
 
 
 def prepare_user_info():
@@ -158,7 +158,7 @@ def save_json(path: str | Path, obj):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
-    logger.info(f"Worktree info saved to {path}")
+    logger.info(f"Worktree info saved to `{path}`")
 
 
 def collect_info_and_saved_to_another_branch(worktree_branch_name: str):
@@ -184,10 +184,10 @@ def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
             allow_fail=True,
         )
     except subprocess.CalledProcessError:
-        logger.info(f"Worktree branch {worktree_branch_name} is empty")
+        logger.info(f"Worktree branch `{worktree_branch_name}` is empty")
         return None
 
-    logger.info(f"Last commit message: {commit_message}")
+    logger.info(f"Last commit message: `{commit_message}`")
     match_result = PAT.findall(commit_message)
     if len(match_result) != 1:
         logger.info("Last commit message does not contain worktree info target")
@@ -195,7 +195,7 @@ def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
         return None
     else:
         hash = match_result[0].decode("ascii")
-        logger.info(f"matched last worktree info target: {hash}")
+        logger.info(f"matched last worktree info target: `{hash}`")
         return hash
 
 
@@ -208,7 +208,7 @@ def main():
 
     # if worktree branch is up-to-date, do nothing
     last_master_branch_commit = cmd(["git", "rev-parse", "HEAD"]).decode("ascii")
-    logger.debug(f"last master branch commit: {last_master_branch_commit}")
+    logger.debug(f"last master branch commit: `{last_master_branch_commit}`")
     if last_worktree_info_target == last_master_branch_commit:
         logger.info("Worktree branch is up-to-date, do nothing")
         return
@@ -220,5 +220,5 @@ def main():
 if __name__ == "__main__":
     logger.level = logging.DEBUG
     # print hash of script myself
-    logger.info(f"Script hash: {hashlib.sha256(open(__file__).read().encode('utf-8')).hexdigest()}")
+    logger.info(f"Script hash: `{hashlib.sha256(open(__file__).read().encode('utf-8')).hexdigest()}`")
     main()
