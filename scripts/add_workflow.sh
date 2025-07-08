@@ -41,34 +41,15 @@ jobs:
         with:
           python-version: '3.12'
       
-      - name: Download and run collect_worktree_info.py
+      - name: Download and run generate_worktree_info.py
         run: |
           # Download the script
-          curl -o collect_worktree_info.py \
-            https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts/collect_worktree_info.py
+          curl -o /tmp/generate_worktree_info.py \
+            https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts/generate_worktree_info.py
           
           # Make it executable and run it
-          chmod +x collect_worktree_info.py
-          python3 collect_worktree_info.py
-          
-          # Clean up the downloaded script
-          rm collect_worktree_info.py
-      
-      - name: Commit worktree info changes
-        run: |
-          # Configure git
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Actions"
-          
-          # Add changes if any exist
-          if [ -n "\$(git status --porcelain)" ]; then
-            git add .hoa/worktree.json
-            git commit -m "Update worktree [skip ci]"
-            git push origin main
-            echo "Worktree updated and committed to main branch"
-          else
-            echo "No changes to commit"
-          fi
+          chmod +x /tmp/generate_worktree_info.py
+          python3 /tmp/generate_worktree_info.py
 
       - name: Trigger workflow in hoa-moe
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -170,7 +151,7 @@ for REPO in $REPOS; do
   fi
 
   # Create a pull request
-  PR_RESULT=$(gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "ci: fix permission issue in workflow" -b "更新后的 workflow 文件会生成一份 worktree 信息" 2>&1)
+  PR_RESULT=$(gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "ci: updated worktree.json generation" -b "更新生成 worktree 文件的脚本" 2>&1)
   PR_EXIT_CODE=$?
   
   if [ $PR_EXIT_CODE -eq 0 ]; then
