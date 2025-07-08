@@ -162,6 +162,8 @@ def collect_info_and_saved_to_another_branch(worktree_branch_name: str):
     prepare_or_checkout_to_worktree_branch(worktree_branch_name)
     save_json("worktree.json", info)
     save_json(f"history/{info_commit_hash}.json", info)
+
+    prepare_user_info()
     cmd(["git", "add", "."])
     cmd(["git", "commit", "-m", f"update worktree info for <|{info_commit_hash}|>"])
     cmd(["git", "push", "--set-upstream", "origin", worktree_branch_name])
