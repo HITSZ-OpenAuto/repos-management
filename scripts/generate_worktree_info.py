@@ -6,6 +6,7 @@ import os
 import logging
 from pathlib import Path
 import re
+import hashlib
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -193,7 +194,9 @@ def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
         logger.debug(match_result)
         return None
     else:
-        return match_result[0].decode("ascii")
+        hash = match_result[0].decode("ascii")
+        logger.info(f"matched last worktree info target: {hash}")
+        return hash
 
 
 def main():
@@ -205,6 +208,7 @@ def main():
 
     # if worktree branch is up-to-date, do nothing
     last_master_branch_commit = cmd(["git", "rev-parse", "HEAD"]).decode("ascii")
+    logger.debug(f"last master branch commit: {last_master_branch_commit}")
     if last_worktree_info_target == last_master_branch_commit:
         logger.info("Worktree branch is up-to-date, do nothing")
         return
@@ -215,4 +219,6 @@ def main():
 
 if __name__ == "__main__":
     logger.level = logging.DEBUG
+    # print hash of script myself
+    logger.info(f"Script hash: {hashlib.sha256(open(__file__).read().encode('utf-8')).hexdigest()}")
     main()
