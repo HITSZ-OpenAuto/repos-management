@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def cmd(cmds, cwd=None) -> bytes:
+def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
     try:
         logger.debug("run: " + " ".join(cmds))
         result = subprocess.run(
@@ -24,6 +24,9 @@ def cmd(cmds, cwd=None) -> bytes:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
+        if allow_fail:
+            # Don't exit on failure, just re-raise
+            raise e
         print(f"Error executing git command: {cmds}")
         print(f"Error output: {e.stderr.strip()}")
         sys.exit(1)
@@ -167,7 +170,14 @@ def collect_info_and_saved_to_another_branch(worktree_branch_name: str):
 
 def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
     PAT = re.compile(rb"<\|([a-z0-9]+)\|>")
-    commit_message = cmd(["git", "log", "-1", "--oneline", worktree_branch_name])
+    try:
+        commit_message = cmd(
+            ["git", "log", "-1", "--oneline", worktree_branch_name, "--"],
+            allow_fail=True,
+        )
+    except subprocess.CalledProcessError:
+        return None
+
     match_result = PAT.findall(commit_message)
     if len(match_result) != 1:
         return None
