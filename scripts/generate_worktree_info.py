@@ -28,7 +28,7 @@ def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
         logger.warning(f"Error executing git command: {cmds}")
         logger.warning(f"Error stdout: {e.stdout.strip()}")
         logger.warning(f"Error stderr: {e.stderr.strip()}")
-        logger.warning(f'Error code: {e.returncode}')
+        logger.warning(f"Error code: {e.returncode}")
         logger.warning(f"Error message: {e}")
         if allow_fail:
             # Don't exit on failure, just re-raise
@@ -176,15 +176,17 @@ def collect_info_and_saved_to_another_branch(worktree_branch_name: str):
     logger.info("Worktree info collected and saved to another branch")
 
 
-def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
+def get_last_worktree_info_target(
+    worktree_branch_name: str, use_remote: bool = True
+) -> str | None:
     PAT = re.compile(rb"<\|([a-z0-9]+)\|>")
     try:
+        branch_name = ("origin/" if use_remote else "") + worktree_branch_name
         commit_message = cmd(
-            ["git", "log", "-1", "--oneline", worktree_branch_name, "--"],
+            ["git", "log", "-1", "--oneline", branch_name, "--"],
             allow_fail=True,
         )
     except subprocess.CalledProcessError as e:
-        logger.info(f'{e}')
         logger.info(f"Worktree branch `{worktree_branch_name}` is empty")
         return None
 
@@ -221,5 +223,7 @@ def main():
 if __name__ == "__main__":
     logger.level = logging.DEBUG
     # print hash of script myself
-    logger.info(f"Script hash: `{hashlib.sha256(open(__file__).read().encode('utf-8')).hexdigest()}`")
+    logger.info(
+        f"Script hash: `{hashlib.sha256(open(__file__).read().encode('utf-8')).hexdigest()}`"
+    )
     main()
