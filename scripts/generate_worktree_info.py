@@ -184,8 +184,11 @@ def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
     except subprocess.CalledProcessError:
         return None
 
+    logger.info(f"Last commit message: {commit_message}")
     match_result = PAT.findall(commit_message)
     if len(match_result) != 1:
+        logger.info("Last commit message does not contain worktree info target")
+        logger.debug(match_result)
         return None
     else:
         return match_result[0].decode("ascii")
