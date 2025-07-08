@@ -25,11 +25,11 @@ def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error executing git command: {cmds}")
-        print(f"Error stdout: {e.stdout.strip()}")
-        print(f"Error stderr: {e.stderr.strip()}")
-        print(f'Error code: {e.returncode}')
-        print(f"Error message: {e}")
+        logger.warning(f"Error executing git command: {cmds}")
+        logger.warning(f"Error stdout: {e.stdout.strip()}")
+        logger.warning(f"Error stderr: {e.stderr.strip()}")
+        logger.warning(f'Error code: {e.returncode}')
+        logger.warning(f"Error message: {e}")
         if allow_fail:
             # Don't exit on failure, just re-raise
             raise
