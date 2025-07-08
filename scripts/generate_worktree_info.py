@@ -4,6 +4,8 @@ import json
 import sys
 import os
 import logging
+from pathlib import Path
+import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def cmd(cmds, cwd=None) -> bytes:
     try:
+        logger.debug("run: " + " ".join(cmds))
         result = subprocess.run(
             cmds,
             check=True,
@@ -24,6 +27,17 @@ def cmd(cmds, cwd=None) -> bytes:
         print(f"Error executing git command: {cmds}")
         print(f"Error output: {e.stderr.strip()}")
         sys.exit(1)
+
+
+def return_code(cmds) -> int:
+    logger.debug("test: " + " ".join(cmds))
+    result = subprocess.run(
+        cmds,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=False,
+    )
+    return result.returncode
 
 
 def is_digit_in_ascii(c: int) -> bool:
@@ -81,7 +95,7 @@ def decode_git_ls_tree_path(content: bytes) -> str:
     return bytes(escaped_array).decode("utf-8")
 
 
-def main():
+def collect_info_for_head_commit() -> dict:
     # 构建 commit-graph 以加速 git log
     cmd(["git", "commit-graph", "write", "--reachable"])
 
@@ -110,13 +124,72 @@ def main():
         files_data[file_path]["time"] = int(timestamp)
         files_data[file_path]["hash"] = commit_hash.decode("ascii")
 
-    # 输出到指定的文件夹并保存为 JSON 格式
-    output_folder = ".hoa"
-    output_file = "worktree.json"
-    os.makedirs(output_folder, exist_ok=True)
-    with open(os.path.join(output_folder, output_file), "w", encoding="utf-8") as f:
-        json.dump(files_data, f, indent=2, ensure_ascii=False)
-        logger.info(f"Worktree info saved to {os.path.join(output_folder, output_file)}")
+    return files_data
+
+
+def prepare_or_checkout_to_worktree_branch(name: str):
+    if return_code(["git", "show-ref", "--quiet", "--branches", name]) != 0:
+        logger.info(f"Creating new orphan worktree branch {name}")
+        cmd(["git", "checkout", "--orphan", name])
+    else:
+        logger.info(f"Switching to worktree branch {name}")
+        cmd(["git", "checkout", name])
+
+
+def prepare_user_info():
+    logger.info("Setting user info")
+    cmd(["git", "config", "--local", "user.email", "action@github.com"])
+    cmd(["git", "config", "--local", "user.name", "GitHub Actions"])
+
+
+def save_json(path: str | Path, obj):
+    if isinstance(path, str):
+        path = Path(path)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=2, ensure_ascii=False)
+    logger.info(f"Worktree info saved to {path}")
+
+
+def collect_info_and_saved_to_another_branch(worktree_branch_name: str):
+    info_commit_hash = cmd(["git", "rev-parse", "HEAD"]).decode("ascii")
+    info = collect_info_for_head_commit()
+
+    prepare_or_checkout_to_worktree_branch(worktree_branch_name)
+    save_json("worktree.json", info)
+    save_json(f"history/{info_commit_hash}.json", info)
+    cmd(["git", "add", "."])
+    cmd(["git", "commit", "-m", f"update worktree info for <|{info_commit_hash}|>"])
+    cmd(["git", "push", "--set-upstream", "origin", worktree_branch_name])
+    logger.info("Worktree info collected and saved to another branch")
+
+
+def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
+    PAT = re.compile(rb"<\|([a-z0-9]+)\|>")
+    commit_message = cmd(["git", "log", "-1", "--oneline", worktree_branch_name])
+    match_result = PAT.findall(commit_message)
+    if len(match_result) != 1:
+        return None
+    else:
+        return match_result[0].decode("ascii")
+
+
+def main():
+    # assume worktree branch name
+    worktree_branch_name = "worktree"
+
+    # get last worktree info target
+    last_worktree_info_target = get_last_worktree_info_target(worktree_branch_name)
+
+    # if worktree branch is up-to-date, do nothing
+    last_master_branch_commit = cmd(["git", "rev-parse", "HEAD"]).decode("ascii")
+    if last_worktree_info_target == last_master_branch_commit:
+        logger.info("Worktree branch is up-to-date, do nothing")
+        return
+
+    # collect info and save to another branch
+    collect_info_and_saved_to_another_branch(worktree_branch_name)
 
 
 if __name__ == "__main__":
