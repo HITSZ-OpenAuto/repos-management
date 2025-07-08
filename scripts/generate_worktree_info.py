@@ -183,7 +183,8 @@ def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
             ["git", "log", "-1", "--oneline", worktree_branch_name, "--"],
             allow_fail=True,
         )
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logger.info(f'{e}')
         logger.info(f"Worktree branch `{worktree_branch_name}` is empty")
         return None
 
