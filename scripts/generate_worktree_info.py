@@ -24,15 +24,16 @@ def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        if allow_fail:
-            # Don't exit on failure, just re-raise
-            raise e
         print(f"Error executing git command: {cmds}")
         print(f"Error stdout: {e.stdout.strip()}")
         print(f"Error stderr: {e.stderr.strip()}")
         print(f'Error code: {e.returncode}')
         print(f"Error message: {e}")
-        sys.exit(1)
+        if allow_fail:
+            # Don't exit on failure, just re-raise
+            raise e
+        else:
+            sys.exit(1)
 
 
 def return_code(cmds) -> int:
@@ -182,6 +183,7 @@ def get_last_worktree_info_target(worktree_branch_name: str) -> str | None:
             allow_fail=True,
         )
     except subprocess.CalledProcessError:
+        logger.info(f"Worktree branch {worktree_branch_name} is empty")
         return None
 
     logger.info(f"Last commit message: {commit_message}")
