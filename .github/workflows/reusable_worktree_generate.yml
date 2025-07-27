@@ -45,6 +45,7 @@ jobs:
         run:        
           python3 .repo_management/scripts/generate_worktree_info.py
           echo "Worktree generated and branch created successfully."
+          rm -rf .repo_management
 
       - name: Trigger workflow in hoa-moe
         if: inputs.trigger_page_build == 'true'
