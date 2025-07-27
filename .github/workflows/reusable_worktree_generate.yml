@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HITSZ-OpenAuto/repos-management
-          path: ${{ runner.temp }}
+          path: .repo_management
           token: ${{ secrets.PAT }}
           # Use sparse checkout to only get the necessary script
           sparse-checkout: |
@@ -43,7 +43,7 @@ jobs:
       
       - name: Run script to generate worktree info
         run:        
-          python3 ${{ runner.temp }}/scripts/generate_worktree_info.py
+          python3 .repo_management/scripts/generate_worktree_info.py
           echo "Worktree generated and branch created successfully."
 
       - name: Trigger workflow in hoa-moe
