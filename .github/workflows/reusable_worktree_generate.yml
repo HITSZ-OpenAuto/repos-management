@@ -28,7 +28,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: HITSZ-OpenAuto/repos-management
-          path: .repos-management
           token: ${{ secrets.PAT }}
           # Use sparse checkout to only get the necessary script
           sparse-checkout: |
