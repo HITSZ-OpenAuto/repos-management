@@ -29,6 +29,7 @@ jobs:
         with:
           repository: HITSZ-OpenAuto/repos-management
           path: .repo_management
+          ref: ${{ github.workflow_ref }}
           token: ${{ secrets.PAT }}
           # Use sparse checkout to only get the necessary script
           sparse-checkout: |
