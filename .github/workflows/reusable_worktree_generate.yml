@@ -24,31 +24,22 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.PAT }}
       
-      - name: Checkout generate_worktree_info.py script
-        uses: actions/checkout@v4
-        with:
-          repository: HITSZ-OpenAuto/repos-management
-          path: .repo_management
-          ref: main
-          token: ${{ secrets.PAT }}
-          # Use sparse checkout to only get the necessary script
-          sparse-checkout: |
-            scripts/generate_worktree_info.py
-          # Disable cone mode to allow single-file sparse checkouts
-          sparse-checkout-cone-mode: false
-      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       
-      - name: Run script to generate worktree info
-        run:        
-          python3 .repo_management/scripts/generate_worktree_info.py
-          echo "Worktree generated and branch created successfully."
-          rm -rf .repo_management
+      - name: Fetch and run generate_worktree_info.py script
+        run: |
+          # Download the script
+          curl -o /tmp/generate_worktree_info.py \
+          https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts/generate_worktree_info.py
+          
+          # Make it executable and run it
+          chmod +x /tmp/generate_worktree_info.py
+          python3 /tmp/generate_worktree_info.py
 
-      - name: Trigger workflow in hoa-moe
+      - name: Trigger workflow in hoa-moe (optional)
         if: inputs.trigger_page_build == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
