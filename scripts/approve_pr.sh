@@ -10,7 +10,7 @@ source .env
 for REPO in $REPOS; do
   # Fetch number of the PR with '[automated-generate-PR]' in the title
   # By default, fetch the number of the latest PR
-  PR_NUMBER=$(gh pr list -R "HITSZ-OpenAuto/$REPO" --search "[automated-generated-PR] in:title" --json number -q '.[0].number')
+  PR_NUMBER=$(gh pr list -R "HITSZ-OpenAuto/$REPO" --search "${PR_MARKER} in:title" --json number -q '.[0].number')
 
   if [ -z "$PR_NUMBER" ]; then
     echo "No open pull requests found for $REPO"
