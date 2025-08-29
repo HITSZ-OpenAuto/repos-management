@@ -1,13 +1,9 @@
 #!/bin/bash
 REPOS=$(cat repos_list.txt)
 
-# GitHub Personal Access Token
-source .env
-
-# echo "Using PAT: $PERSONAL_ACCESS_TOKEN"
-
-# Initialize timezone hour counter
+# Initialize
 TIMEZONE_HOUR=0
+PR_MARKER="[automated-generated-pr]"
 
 # Function to generate full workflow content with specific hour
 generate_full_workflow_content() {
