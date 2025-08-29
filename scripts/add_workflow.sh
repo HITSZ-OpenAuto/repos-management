@@ -1,7 +1,9 @@
 #!/bin/bash
-# description of this PR, remember to modify accordingly
-PR_DESCRIPTION="ci: use a unified reusable workflow" 
 
+# Load Personal Access Token
+source .env
+
+PR_DESCRIPTION="ci: use a unified reusable workflow" 
 REPOS=$(cat repos_list.txt)
 
 # Initialize
