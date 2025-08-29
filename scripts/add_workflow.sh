@@ -1,4 +1,7 @@
 #!/bin/bash
+# description of this PR, remember to modify accordingly
+PR_DESCRIPTION="ci: use a unified reusable workflow" 
+
 REPOS=$(cat repos_list.txt)
 
 # Initialize
@@ -27,10 +30,10 @@ jobs:
 
     with:
       # trigger_page_build == true only when pushing to main branch
-      trigger_page_build: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      trigger_page_build: \${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
     secrets:
-      PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      PAT: \${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 EOF
 }
@@ -97,7 +100,7 @@ for REPO in $REPOS; do
       -H "Authorization: token $PERSONAL_ACCESS_TOKEN" \
       -H "Accept: application/vnd.github.v3+json" \
       "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" \
-      -f message="ci: fix permission issue in workflow" \
+      -f message="$PR_DESCRIPTION" \
       -f content="$WORKFLOW_CONTENT_BASE64" \
       -f branch="$BRANCH_NAME" \
       -f sha="$FILE_SHA" 2>&1)
@@ -107,7 +110,7 @@ for REPO in $REPOS; do
       -H "Authorization: token $PERSONAL_ACCESS_TOKEN" \
       -H "Accept: application/vnd.github.v3+json" \
       "/repos/HITSZ-OpenAuto/$REPO/contents/.github/workflows/trigger-workflow.yml" \
-      -f message="ci: fix permission issue in workflow" \
+      -f message="$PR_DESCRIPTION" \
       -f content="$WORKFLOW_CONTENT_BASE64" \
       -f branch="$BRANCH_NAME" 2>&1)
   fi
@@ -121,7 +124,7 @@ for REPO in $REPOS; do
   fi
 
   # Create a pull request
-  PR_RESULT=$(gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "${PR_MARKER} ci: updated worktree.json generation" -b "更新生成 worktree 文件的脚本" 2>&1)
+  PR_RESULT=$(gh pr create -R "HITSZ-OpenAuto/$REPO" -B main -H "$BRANCH_NAME" -t "${PR_MARKER} ci: updated worktree.json generation" -b "$PR_DESCRIPTION" 2>&1)
   PR_EXIT_CODE=$?
   
   if [ $PR_EXIT_CODE -eq 0 ]; then
