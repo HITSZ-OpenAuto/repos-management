@@ -8,8 +8,16 @@ PR_DESCRIPTION="ci: use a unified reusable workflow"
 REPOS=$(cat repos_list.txt)
 PR_MARKER="[automated-generated-pr]"
 
-WORKFLOW_TEMPLATE_PATH="$(dirname "$0")/../.github/workflows/call-worktree-update.yml"
-WORKFLOW_CONTENT=$(cat "$WORKFLOW_TEMPLATE_PATH")
+
+NEW_WORKFLOW_PATH="$(dirname "$0")/../.github/workflows/call_worktree_update.yml"
+
+# Check if the workflow template file exists
+if [ ! -f "$NEW_WORKFLOW_PATH" ]; then
+  echo "Error: Workflow file not found at $NEW_WORKFLOW_PATH"
+  exit 1
+fi
+
+WORKFLOW_CONTENT=$(cat "$NEW_WORKFLOW_PATH")
 
 # Loop through the repositories and add the workflow file via PR
 for REPO in $REPOS; do
