@@ -8,16 +8,16 @@ PR_DESCRIPTION="ci: use a unified reusable workflow"
 REPOS=$(cat repos_list.txt)
 PR_MARKER="[automated-generated-pr]"
 
+# Fetch workflow content from the online repository
+NEW_WORKFLOW_URL="https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/refs/heads/main/call_worktree_update.yml"
 
-NEW_WORKFLOW_PATH="$(dirname "$0")/../.github/workflows/call_worktree_update.yml"
+echo "Fetching workflow content from $NEW_WORKFLOW_URL"
+WORKFLOW_CONTENT=$(curl -sSLf "$NEW_WORKFLOW_URL")
 
-# Check if the workflow template file exists
-if [ ! -f "$NEW_WORKFLOW_PATH" ]; then
-  echo "Error: Workflow file not found at $NEW_WORKFLOW_PATH"
+if [ $? -ne 0 ] || [ -z "$WORKFLOW_CONTENT" ]; then
+  echo "Error: Failed to fetch workflow content from $NEW_WORKFLOW_URL"
   exit 1
 fi
-
-WORKFLOW_CONTENT=$(cat "$NEW_WORKFLOW_PATH")
 
 # Loop through the repositories and add the workflow file via PR
 for REPO in $REPOS; do
