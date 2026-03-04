@@ -768,8 +768,14 @@ class MarkdownParser:
     def _parse_multi_project(self):
         """Parse multi-project structure."""
         current_course: Course | None = None
-        courses_started = False  # Track whether we've seen <!-- TOML-COURSES-START -->
         description_lines: list[str] = []
+
+        # Pre-scan: check if TOML-COURSES-START marker exists anywhere
+        has_courses_marker = any(
+            line.strip() == "<!-- TOML-COURSES-START -->"
+            for line in self.lines[self.pos:]
+        )
+        courses_started = False
 
         while self.pos < len(self.lines):
             line = self.lines[self.pos]
@@ -785,6 +791,17 @@ class MarkdownParser:
 
             # Before courses start, collect description lines
             if not courses_started:
+                # If we hit a ## heading and there is NO TOML-COURSES-START marker
+                # anywhere in the file, treat first ## as implicit courses start
+                # (fallback for human-edited READMEs that never had the marker).
+                if line.startswith("## ") and not has_courses_marker:
+                    if description_lines:
+                        self.doc.description = normalize_text("\n".join(description_lines))
+                        description_lines = []
+                    courses_started = True
+                    # Do NOT advance self.pos — let the ## handler below pick it up
+                    continue
+
                 # Skip blank lines at the very start
                 if not description_lines and not line.strip():
                     self.pos += 1
