@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: RDME autogen (format + generate + warning)
+      - name: RDME bidirectional autogen (format + sync + warning)
         id: rdme
         continue-on-error: true
         run: |
@@ -67,12 +67,13 @@ jobs:
           fi
           set -e
 
-          curl -Ls -o /tmp/rdme_autogen.py \
-            https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts/rdme_autogen.py
+          SCRIPTS_BASE="https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts"
+          curl -Ls -o /tmp/rdme_autogen.py "${SCRIPTS_BASE}/rdme_autogen.py"
           python3 /tmp/rdme_autogen.py \
             --toml readme.toml \
             --readme README.md \
-            --converter-url https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts/convert_toml_to_readme.py
+            --converter-url "${SCRIPTS_BASE}/convert_toml_to_readme.py" \
+            --reverse-converter-url "${SCRIPTS_BASE}/readme_to_toml.py"
 
       - name: Commit & push TOML/README changes (main only)
         if: >-
@@ -90,7 +91,7 @@ jobs:
           fi
 
           # Prevent this automated push from re-triggering workflows.
-          git commit -m "ci: format toml & regenerate README [automated] [skip ci]"
+          git commit -m "ci: bidirectional sync toml <-> README [automated] [skip ci]"
 
           # Push without rebase. If main moved meanwhile, retry once by
           # resetting to the latest main and re-running RDME.
@@ -106,10 +107,12 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
+          SCRIPTS_BASE="https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts"
           python3 /tmp/rdme_autogen.py \
             --toml readme.toml \
             --readme README.md \
-            --converter-url https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts/convert_toml_to_readme.py || true
+            --converter-url "${SCRIPTS_BASE}/convert_toml_to_readme.py" \
+            --reverse-converter-url "${SCRIPTS_BASE}/readme_to_toml.py" || true
 
           git add readme.toml README.md || true
           if git diff --staged --quiet; then
@@ -117,7 +120,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "ci: format toml & regenerate README [automated] [skip ci]" || true
+          git commit -m "ci: bidirectional sync toml <-> README [automated] [skip ci]" || true
           set +e
           git push origin HEAD:main
           rc=$?

@@ -316,11 +316,20 @@ def _render_lecturers(lecturers: Any) -> list[str]:
         lines.append(f"- {name}")
 
         reviews = [x for x in _as_list(lec.get("reviews")) if isinstance(x, dict)]
-        for rv in reviews:
+        for ri, rv in enumerate(reviews):
             content = _norm_block(rv.get("content"))
             author = rv.get("author")
             if not content and not author:
                 continue
+
+            # Add TOML-ITEM comment for round-trip preservation
+            author_meta = ""
+            if isinstance(author, list):
+                author_meta = ' author_type="list"'
+            elif isinstance(author, dict) and not _render_author(author):
+                # Empty author dict - preserve with comment
+                author_meta = ' has_author="true"'
+            lines.append(f'  <!-- TOML-ITEM: id="review-{name}-{ri+1}"{author_meta} -->')
 
             content_lines = content.split("\n") if content else []
             bullet_lines = _listify_md_lines(content_lines, indent="  ")
@@ -378,6 +387,7 @@ def _render_section_items(items: Any) -> list[dict]:
             {
                 "content": _norm_block(it.get("content")),
                 "author": it.get("author"),
+                "topic": _s(it.get("topic")).strip(),
             }
         )
     return out
@@ -411,12 +421,16 @@ def _render_sections_schema(data: dict, *, grades_summary: dict | None = None) -
     course_name = _s(data.get("course_name")).strip()
     course_code = _s(data.get("course_code")).strip()
     description = _norm_block(data.get("description"))
+    repo_type = _s(data.get("repo_type")).strip().lower() or "normal"
 
     lines: list[str] = []
     if course_code and course_name:
         lines.append(f"# {course_code} - {course_name}")
     else:
         lines.append(f"# {course_name or course_code or '课程'}")
+
+    # Preserve repo_type in a TOML-META comment for round-trip
+    lines.append(f'<!-- TOML-META: repo_type="{repo_type}" -->')
 
     sections = [x for x in _as_list(data.get("sections")) if isinstance(x, dict)]
 
@@ -429,6 +443,15 @@ def _render_sections_schema(data: dict, *, grades_summary: dict | None = None) -
         sections, fallback_grading_badges=fallback_grading_badges
     )
     if basic_badges:
+        # Mark badge source for round-trip: "basic_info" = from TOML 基本信息 section,
+        # "grades_summary" = external fallback (should NOT be written back to TOML).
+        has_basic_info_section = any(
+            _s(s.get("title")).strip() == "基本信息"
+            for s in _as_list(data.get("sections"))
+            if isinstance(s, dict)
+        )
+        badge_source = "basic_info" if has_basic_info_section else "grades_summary"
+        lines.append(f'<!-- TOML-BADGES: source="{badge_source}" -->')
         lines.append("")
         lines.extend(basic_badges)
 
@@ -448,9 +471,29 @@ def _render_sections_schema(data: dict, *, grades_summary: dict | None = None) -
 
         lines.append("")
         lines.append(f"## {title}")
-        for it in items:
+        # Add TOML section comment placeholder for bidirectional sync
+        lines.append(f'<!-- TOML-SECTION: title="{title}" -->')
+        
+        for i, it in enumerate(items):
             content = it["content"]
             author = it["author"]
+            topic = it.get("topic", "")
+            
+            # Build TOML-ITEM comment with all metadata
+            toml_item_parts = [f'id="item-{title}-{i+1}"']
+            if topic:
+                toml_item_parts.append(f'topic="{topic}"')
+            
+            # Track author type for round-trip
+            if isinstance(author, list):
+                toml_item_parts.append('author_type="list"')
+            elif isinstance(author, dict) and not _render_author(author):
+                toml_item_parts.append('has_author="true"')
+            
+            # Always add TOML-ITEM comment to preserve metadata
+            lines.append("")
+            lines.append(f'<!-- TOML-ITEM: {" ".join(toml_item_parts)} -->')
+            
             if content:
                 lines.append("")
                 lines.append(content)
@@ -458,7 +501,6 @@ def _render_sections_schema(data: dict, *, grades_summary: dict | None = None) -
             if aq:
                 lines.append("")
                 lines.append(aq)
-
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -473,11 +515,20 @@ def render_multi_project(data: dict, *, grades_summary: dict | None = None) -> s
     else:
         lines.append(f"# {course_name or course_code or '课程'}")
 
+    # Preserve repo_type in a TOML-META comment for round-trip
+    lines.append('<!-- TOML-META: repo_type="multi-project" -->')
+
     if description:
         lines.append("")
         lines.append(description)
 
     courses = [x for x in _as_list(data.get("courses")) if isinstance(x, dict)]
+
+    # Mark start of courses (so description with ## headers isn't misinterpreted)
+    if courses:
+        lines.append("")
+        lines.append("<!-- TOML-COURSES-START -->")
+
     for c in courses:
         name = _s(c.get("name")).strip()
         code = _s(c.get("code")).strip()
@@ -485,6 +536,8 @@ def render_multi_project(data: dict, *, grades_summary: dict | None = None) -> s
 
         lines.append("")
         lines.append(f"## {header}")
+        # Preserve exact code/name for lossless round-trip (name may contain ' - ')
+        lines.append(f'<!-- TOML-COURSE: code="{code}" name="{name}" -->')
 
         # Basic info badges (and strip the section from body)
         sections = [x for x in _as_list(c.get("sections")) if isinstance(x, dict)]
@@ -498,6 +551,13 @@ def render_multi_project(data: dict, *, grades_summary: dict | None = None) -> s
             sections, fallback_grading_badges=fallback_grading_badges
         )
         if basic_badges:
+            has_basic_info_section = any(
+                _s(s.get("title")).strip() == "基本信息"
+                for s in _as_list(c.get("sections"))
+                if isinstance(s, dict)
+            )
+            badge_source = "basic_info" if has_basic_info_section else "grades_summary"
+            lines.append(f'<!-- TOML-BADGES: source="{badge_source}" -->')
             lines.append("")
             lines.extend(basic_badges)
 
@@ -526,6 +586,45 @@ def render_multi_project(data: dict, *, grades_summary: dict | None = None) -> s
                 if aq:
                     lines.append("")
                     lines.append(aq)
+
+        # Render course-level reviews (flat items grouped by topic)
+        reviews = [x for x in _as_list(c.get("reviews")) if isinstance(x, dict)]
+        if reviews:
+            from collections import OrderedDict
+            groups: OrderedDict[str, list[dict]] = OrderedDict()
+            for rev in reviews:
+                topic = _s(rev.get("topic")).strip() or "评价"
+                groups.setdefault(topic, []).append(rev)
+            for topic, items_list in groups.items():
+                lines.append("")
+                lines.append(f"### {header} - {topic}")
+                lines.append("<!-- TOML-COURSE-REVIEWS -->")
+                for item in items_list:
+                    content = _norm_block(item.get("content"))
+                    author = item.get("author")
+                    if content:
+                        lines.append("")
+                        lines.append(content)
+                    aq = _render_author(author)
+                    if aq:
+                        lines.append("")
+                        lines.append(aq)
+
+    # Render misc field (e.g. MOOC)
+    misc_items = [x for x in _as_list(data.get("misc")) if isinstance(x, dict)]
+    if misc_items:
+        lines.append("")
+        lines.append("<!-- TOML-MISC -->")
+        for mi in misc_items:
+            content = _norm_block(mi.get("content"))
+            author = mi.get("author")
+            if content:
+                lines.append("")
+                lines.append(content)
+            aq = _render_author(author)
+            if aq:
+                lines.append("")
+                lines.append(aq)
 
     return "\n".join(lines).rstrip() + "\n"
 

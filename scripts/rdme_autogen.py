@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
-"""RDME TOML -> README automation runner.
+"""RDME bidirectional TOML <-> README automation runner.
 
 This script is designed to be executed inside *course repos* via a reusable
 workflow. Course repos usually do not contain the generator scripts, so this
-runner downloads the canonical converter from the central `repos-management`
-repository and executes it.
+runner downloads the canonical converters from the central `repos-management`
+repository and executes them.
+
+Bidirectional sync logic:
+- Detect which file changed via ``git diff HEAD~1 --name-only``
+- TOML changed (or both changed) → forward: TOML → README  (TOML is source of truth)
+- Only README changed           → reverse: README → TOML, then forward to normalise
+- Neither (manual trigger)      → forward only
+- readme.toml missing           → no-op
 
 It also manages an idempotent WARNING block at the top of README.md:
 - on success (main branch): clears the warning block
@@ -30,11 +37,19 @@ from pathlib import Path
 WARNING_START = "<!-- RDME_TOML_AUTOGEN_WARNING_START -->"
 WARNING_END = "<!-- RDME_TOML_AUTOGEN_WARNING_END -->"
 
+_BASE_RAW = (
+    "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts"
+)
+
 GRADES_SUMMARY_URL = (
     "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/"
     "grades_summary.toml"
 )
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _append_github_output(key: str, value: str) -> None:
     out = os.getenv("GITHUB_OUTPUT")
@@ -101,6 +116,12 @@ def _update_warning(readme_path: Path, *, set_warning: bool, message: str = "") 
 
 
 def _download(url: str, dest: Path) -> None:
+    # Support local file paths for testing: copy instead of HTTP download.
+    if url.startswith("/") or url.startswith("file://"):
+        import shutil as _shutil
+        src = url.removeprefix("file://")
+        _shutil.copy2(src, dest)
+        return
     req = urllib.request.Request(url, headers={"User-Agent": "rdme-autogen"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         dest.write_bytes(resp.read())
@@ -113,16 +134,49 @@ def _run(cmd: list[str], *, cwd: Path) -> tuple[bool, str]:
     return ok, out.strip()
 
 
+# ---------------------------------------------------------------------------
+# Change detection
+# ---------------------------------------------------------------------------
+
+def _detect_direction(repo_root: Path, toml_name: str, readme_name: str) -> str:
+    """Detect which file was modified in the latest commit.
+
+    Returns one of: ``"toml"``, ``"readme"``, ``"both"``, ``"none"``.
+    Falls back to ``"toml"`` (forward) on any error.
+    """
+    try:
+        ok, out = _run(["git", "diff", "HEAD~1", "--name-only"], cwd=repo_root)
+        if not ok:
+            return "toml"
+        changed = {l.strip() for l in out.strip().splitlines() if l.strip()}
+        t = toml_name in changed
+        r = readme_name in changed
+        if t and r:
+            return "both"
+        if t:
+            return "toml"
+        if r:
+            return "readme"
+        return "none"
+    except Exception:
+        return "toml"
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main() -> int:
-    p = argparse.ArgumentParser(description="RDME autogen runner")
+    p = argparse.ArgumentParser(description="RDME bidirectional autogen runner")
     p.add_argument("--toml", default="readme.toml")
     p.add_argument("--readme", default="README.md")
     p.add_argument(
         "--converter-url",
-        default=(
-            "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/"
-            "scripts/convert_toml_to_readme.py"
-        ),
+        default=f"{_BASE_RAW}/convert_toml_to_readme.py",
+    )
+    p.add_argument(
+        "--reverse-converter-url",
+        default=f"{_BASE_RAW}/readme_to_toml.py",
     )
     args = p.parse_args()
 
@@ -133,50 +187,148 @@ def main() -> int:
     is_main = os.getenv("GITHUB_REF") == "refs/heads/main"
 
     toml_exists = toml_path.exists()
+    readme_exists = readme_path.exists()
     _append_github_output("toml_exists", "true" if toml_exists else "false")
 
-    if not toml_exists:
-        print(f"[rdme] no-op: {toml_path} not found")
+    if not toml_exists and not readme_exists:
+        print(f"[rdme] no-op: neither {args.toml} nor {args.readme} found")
         return 0
 
+    # --- Detect sync direction -------------------------------------------
+    direction = _detect_direction(repo_root, args.toml, args.readme)
+    print(f"[rdme] detected change direction: {direction}")
+
+    # --- Migration check: README without HTML comment markers -----------
+    #   If README exists but lacks <!-- TOML-META: -->, it was generated by
+    #   the old (pre-bidirectional) converter.  Force forward (TOML → README)
+    #   to inject the markers, regardless of which file changed.
+    needs_migration = False
+    if readme_exists and toml_exists:
+        try:
+            readme_text = readme_path.read_text(encoding="utf-8")
+            if "<!-- TOML-META:" not in readme_text:
+                needs_migration = True
+                print("[rdme] README lacks TOML-META marker → forcing forward pass for migration")
+        except Exception:
+            pass
+
+    # Decision matrix:
+    #   toml / both / none / workflow_dispatch → forward (TOML wins)
+    #   readme (only README changed)          → reverse then forward
+    #   needs_migration                       → forward only (skip reverse even if README changed)
+    need_reverse = (
+        direction == "readme"
+        and toml_exists
+        and readme_exists
+        and not needs_migration
+    )
+
+    if not toml_exists and readme_exists:
+        # Edge case: TOML doesn't exist yet but README does → reverse to bootstrap TOML
+        need_reverse = True
+        print("[rdme] readme.toml missing; will bootstrap from README.md")
+
+    # --- Format TOML with taplo (skip when doing reverse first) ----------
     fmt_ok = True
     fmt_log = ""
-    if shutil.which("taplo") is not None:
-        fmt_ok, fmt_log = _run(["taplo", "fmt", str(toml_path)], cwd=repo_root)
-    else:
-        print("[rdme] taplo not found; skip formatting")
+    if not need_reverse:
+        if shutil.which("taplo") is not None:
+            fmt_ok, fmt_log = _run(["taplo", "fmt", str(toml_path)], cwd=repo_root)
+        else:
+            print("[rdme] taplo not found; skip formatting")
 
+    # --- Download scripts ------------------------------------------------
     gen_ok = False
     gen_log = ""
+    rev_ok = True
+    rev_log = ""
+
     with tempfile.TemporaryDirectory(prefix="rdme-autogen-") as tmp:
-        conv = Path(tmp) / "convert_toml_to_readme.py"
-        grades = Path(tmp) / "grades_summary.toml"
+        tmp_dir = Path(tmp)
+        conv = tmp_dir / "convert_toml_to_readme.py"
+        rev_conv = tmp_dir / "readme_to_toml.py"
+        grades = tmp_dir / "grades_summary.toml"
+
+        # Download forward converter (always needed)
         try:
             _download(args.converter_url, conv)
         except Exception as e:
             gen_ok = False
             gen_log = f"download converter failed: {e}"
-        else:
-            # Best-effort: download grades summary for badge rendering.
+            # Cannot proceed without forward converter
+            ok = False
+            _report_failure(is_main, readme_path, fmt_ok, fmt_log, gen_ok, gen_log, rev_ok, rev_log)
+            return 0 if ok else 1
+
+        # Download reverse converter (only when needed)
+        if need_reverse:
             try:
-                _download(GRADES_SUMMARY_URL, grades)
-            except Exception:
-                pass
+                _download(args.reverse_converter_url, rev_conv)
+            except Exception as e:
+                rev_ok = False
+                rev_log = f"download reverse converter failed: {e}"
+                need_reverse = False  # fall back to forward only
 
-            # Run converter in tmp so it can discover grades_summary.toml from cwd.
-            gen_ok, gen_log = _run(
-                [sys.executable, str(conv), "--input", str(toml_path.resolve()), "--overwrite"],
-                cwd=Path(tmp),
+        # Best-effort: download grades summary for badge rendering.
+        try:
+            _download(GRADES_SUMMARY_URL, grades)
+        except Exception:
+            pass
+
+        # --- Run reverse: README → TOML ---------------------------------
+        if need_reverse and rev_ok:
+            print("[rdme] running reverse: README.md → readme.toml")
+            rev_ok, rev_log = _run(
+                [
+                    sys.executable, str(rev_conv),
+                    "--input", str(readme_path.resolve()),
+                    "--output", str(toml_path.resolve()),
+                    "--overwrite",
+                ],
+                cwd=repo_root,
             )
+            if rev_ok:
+                print("[rdme] reverse OK")
+                # Format the newly generated TOML
+                if shutil.which("taplo") is not None:
+                    fmt_ok, fmt_log = _run(["taplo", "fmt", str(toml_path)], cwd=repo_root)
+            else:
+                print("[rdme] reverse FAILED")
+                if rev_log:
+                    print(rev_log)
 
-    ok = fmt_ok and gen_ok
+        # --- Run forward: TOML → README ---------------------------------
+        print("[rdme] running forward: readme.toml → README.md")
+        gen_ok, gen_log = _run(
+            [sys.executable, str(conv), "--input", str(toml_path.resolve()), "--overwrite"],
+            cwd=tmp_dir,
+        )
+
+    ok = fmt_ok and gen_ok and rev_ok
+    _report_failure(is_main, readme_path, fmt_ok, fmt_log, gen_ok, gen_log, rev_ok, rev_log)
+    _append_github_output("direction", direction)
+    _append_github_output("need_reverse", "true" if need_reverse else "false")
+    return 0 if ok else 1
+
+
+def _report_failure(
+    is_main: bool,
+    readme_path: Path,
+    fmt_ok: bool,
+    fmt_log: str,
+    gen_ok: bool,
+    gen_log: str,
+    rev_ok: bool,
+    rev_log: str,
+) -> None:
+    """Print error logs and manage WARNING block."""
+    ok = fmt_ok and gen_ok and rev_ok
 
     if is_main:
         if ok:
             _update_warning(readme_path, set_warning=False)
         else:
             msg = "TOML 自动化格式化/生成 README 失败：请检查 readme.toml，并查看 Actions 日志。"
-            # Keep README clean: do not dump full logs into warning.
             _update_warning(readme_path, set_warning=True, message=msg)
 
     if not fmt_ok:
@@ -187,8 +339,10 @@ def main() -> int:
         print("[rdme] generate README failed")
         if gen_log:
             print(gen_log)
-
-    return 0 if ok else 1
+    if not rev_ok:
+        print("[rdme] reverse convert failed")
+        if rev_log:
+            print(rev_log)
 
 
 if __name__ == "__main__":
