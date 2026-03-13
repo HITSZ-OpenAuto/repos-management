@@ -33,7 +33,7 @@ except ModuleNotFoundError:
 
 # For writing TOML
 try:
-    import tomli_w
+    import tomli_w  # type: ignore
 except ImportError:
     tomli_w = None  # Will fall back to manual formatting
 
@@ -105,10 +105,32 @@ class Lecturer:
 
     def to_toml(self) -> dict:
         """Convert to TOML dict format."""
-        result = {"name": self.name}
+        result: dict[str, Any] = {"name": self.name}
         if self.reviews:
             result["reviews"] = [r.to_toml() for r in self.reviews]
         return result
+
+
+@dataclass
+class LecturersBlock:
+    """New lecturers block.
+
+    Schema:
+
+    [lecturers]
+      [[lecturers.intro]]     (list[SectionItem])
+      [[lecturers.items]]     (list[Lecturer])
+      [[lecturers.summary]]   (list[SectionItem])
+
+    Legacy schema is represented by putting data into `items`.
+    """
+
+    intro: list[SectionItem] = field(default_factory=list)
+    items: list[Lecturer] = field(default_factory=list)
+    summary: list[SectionItem] = field(default_factory=list)
+
+    def is_empty(self) -> bool:
+        return not self.intro and not self.items and not self.summary
 
 
 @dataclass
@@ -117,13 +139,16 @@ class Section:
 
     title: str = ""
     items: list[SectionItem] = field(default_factory=list)
-    lecturers: list[Lecturer] = field(default_factory=list)  # Special: 授课教师 section
+
+    # Special: 授课教师 section
+    lecturers: list[Lecturer] = field(default_factory=list)  # legacy parsed shape
+    lecturers_block: LecturersBlock | None = None  # new parsed shape
 
     def to_toml(self) -> dict:
         """Convert to TOML dict format."""
-        if self.lecturers:
+        if self.lecturers or self.lecturers_block is not None:
             return {}
-        result = {"title": self.title}
+        result: dict[str, Any] = {"title": self.title}
         if self.items:
             result["items"] = [i.to_toml() for i in self.items]
         return result
@@ -141,7 +166,7 @@ class Course:  # For multi-project schema
 
     def to_toml(self) -> dict:
         """Convert to TOML dict format."""
-        result = {}
+        result: dict[str, Any] = {}
         if self.name:
             result["name"] = self.name
         if self.code:
@@ -164,9 +189,12 @@ class Document:
     repo_type: str = "normal"  # "normal" or "multi-project"
     description: str = ""
     sections: list[Section] = field(default_factory=list)
-    lecturers: list[Lecturer] = field(default_factory=list)
+
+    # Lecturers (new schema)
+    lecturers: LecturersBlock = field(default_factory=LecturersBlock)
+
     courses: list[Course] = field(default_factory=list)  # For multi-project
-    misc: dict = field(default_factory=dict)  # For extra fields like misc in MOOC
+    misc: dict | list[dict] = field(default_factory=dict)  # e.g. MOOC misc
 
     # Metadata from badges
     credits: str = ""
@@ -256,7 +284,7 @@ def parse_author_line(line: str) -> list[Author] | Author | None:
         if m:
             name = m.group(1)
             link = m.group(2)
-            remaining = remaining[m.end():].strip()
+            remaining = remaining[m.end() :].strip()
             date = ""
 
             # Check for comma + date
@@ -265,7 +293,7 @@ def parse_author_line(line: str) -> list[Author] | Author | None:
                 dm = _DATE_RE.match(after_comma)
                 if dm:
                     date = dm.group(0)
-                    remaining = after_comma[dm.end():].strip()
+                    remaining = after_comma[dm.end() :].strip()
                 else:
                     remaining = after_comma
 
@@ -282,7 +310,7 @@ def parse_author_line(line: str) -> list[Author] | Author | None:
                 dm = _DATE_RE.match(after_comma)
                 if dm:
                     date = dm.group(0)
-                    remaining = after_comma[dm.end():].strip()
+                    remaining = after_comma[dm.end() :].strip()
                 else:
                     remaining = after_comma
 
@@ -293,7 +321,7 @@ def parse_author_line(line: str) -> list[Author] | Author | None:
         name_m = re.match(r"^([^,，\[\]]+)", remaining)
         if name_m:
             name_text = name_m.group(1).strip()
-            remaining = remaining[name_m.end():].strip()
+            remaining = remaining[name_m.end() :].strip()
             date = ""
 
             # Check if this looks like a date
@@ -308,7 +336,7 @@ def parse_author_line(line: str) -> list[Author] | Author | None:
                 dm = _DATE_RE.match(after_comma)
                 if dm:
                     date = dm.group(0)
-                    remaining = after_comma[dm.end():].strip()
+                    remaining = after_comma[dm.end() :].strip()
                 else:
                     remaining = after_comma
 
@@ -347,7 +375,11 @@ def parse_badge_url(url: str) -> tuple[str, str, str]:
             decode_shields_component(parts[2]),
         )
     elif len(parts) == 2:
-        return (decode_shields_component(parts[0]), "", decode_shields_component(parts[1]))
+        return (
+            decode_shields_component(parts[0]),
+            "",
+            decode_shields_component(parts[1]),
+        )
     elif len(parts) == 1:
         return (decode_shields_component(parts[0]), "", "")
 
@@ -361,6 +393,7 @@ def parse_toml_comment(line: str) -> dict[str, str]:
     - <!-- TOML-SECTION: title="..." type="..." -->
     - <!-- TOML-ITEM: id="..." topic="..." author_type="list" has_author="true" -->
     - <!-- TOML-META: repo_type="normal" -->
+    - <!-- TOML-LECTURERS: part="intro|items|summary" -->
     """
     m = re.match(r"<!--\s*TOML-(\w+):\s*(.+?)\s*-->", line.strip())
     if not m:
@@ -524,7 +557,11 @@ class MarkdownParser:
                 section = self._parse_section()
                 if section:
                     if section.title == "授课教师":
-                        self.doc.lecturers = section.lecturers
+                        if section.lecturers_block is not None:
+                            self.doc.lecturers = section.lecturers_block
+                        else:
+                            # Legacy: lecturers parsed as plain list
+                            self.doc.lecturers.items = section.lecturers
                     else:
                         self.doc.sections.append(section)
             else:
@@ -548,7 +585,9 @@ class MarkdownParser:
 
         # Special handling for 授课教师
         if title == "授课教师":
-            section.lecturers = self._parse_lecturers()
+            section.lecturers_block = self._parse_lecturers_block()
+            if section.lecturers_block is None:
+                section.lecturers = []
             return section
 
         # Parse items until next H2 or EOF
@@ -565,9 +604,19 @@ class MarkdownParser:
             comment_data = parse_toml_comment(line)
             if comment_data.get("type") == "item":
                 # Save previous item
-                if content_lines or current_item.topic or current_item.item_id or current_item.has_author:
+                if (
+                    content_lines
+                    or current_item.topic
+                    or current_item.item_id
+                    or current_item.has_author
+                ):
                     current_item.content = normalize_text("\n".join(content_lines))
-                    if current_item.content or current_item.topic or current_item.item_id or current_item.has_author:
+                    if (
+                        current_item.content
+                        or current_item.topic
+                        or current_item.item_id
+                        or current_item.has_author
+                    ):
                         section.items.append(current_item)
                     content_lines = []
 
@@ -593,7 +642,12 @@ class MarkdownParser:
                     current_item.author = [parsed_author]
                 else:
                     current_item.author = parsed_author
-                if current_item.content or current_item.author or current_item.topic or current_item.has_author:
+                if (
+                    current_item.content
+                    or current_item.author
+                    or current_item.topic
+                    or current_item.has_author
+                ):
                     section.items.append(current_item)
                 current_item = SectionItem()
                 content_lines = []
@@ -604,28 +658,185 @@ class MarkdownParser:
             self.pos += 1
 
         # Save last item
-        if content_lines or current_item.topic or current_item.item_id or current_item.has_author:
+        if (
+            content_lines
+            or current_item.topic
+            or current_item.item_id
+            or current_item.has_author
+        ):
             current_item.content = normalize_text("\n".join(content_lines))
-            if current_item.content or current_item.topic or current_item.item_id or current_item.has_author:
+            if (
+                current_item.content
+                or current_item.topic
+                or current_item.item_id
+                or current_item.has_author
+            ):
                 section.items.append(current_item)
 
         return section
 
-    def _parse_lecturers(self) -> list[Lecturer]:
-        """Parse lecturers section with nested reviews."""
+    def _parse_lecturers_block(self) -> LecturersBlock:
+        """Parse '授课教师' into the new lecturers block.
+
+        If the file is legacy (no TOML-LECTURERS markers), we parse legacy lecturer list
+        and store it into `items`.
+        """
+
+        # Detect whether this README contains new lecturers markers in this section
+        scan = self.pos
+        has_marker = False
+        while scan < len(self.lines):
+            ln = self.lines[scan]
+            if ln.startswith("## "):
+                break
+            c = parse_toml_comment(ln)
+            if c.get("type") == "lecturers":
+                has_marker = True
+                break
+            scan += 1
+
+        if not has_marker:
+            block = LecturersBlock()
+            block.items = self._parse_lecturers_items_until_boundary()
+            return block
+
+        block = LecturersBlock()
+
+        while self.pos < len(self.lines):
+            line = self.lines[self.pos]
+            if line.startswith("## "):
+                break
+
+            c = parse_toml_comment(line)
+            if c.get("type") == "lecturers":
+                part = (c.get("part") or "").strip().lower()
+                self.pos += 1
+
+                if part == "intro":
+                    block.intro.extend(
+                        self._parse_lecturers_free_items_until_boundary()
+                    )
+                    continue
+                if part == "items":
+                    block.items.extend(self._parse_lecturers_items_until_boundary())
+                    continue
+                if part == "summary":
+                    block.summary.extend(
+                        self._parse_lecturers_free_items_until_boundary()
+                    )
+                    continue
+                continue
+
+            # Tolerate stray blank lines / human edits
+            self.pos += 1
+
+        return block
+
+    def _parse_lecturers_free_items_until_boundary(self) -> list[SectionItem]:
+        """Parse intro/summary items until next lecturers marker / lecturer list / next section."""
+
+        items: list[SectionItem] = []
+        current_item = SectionItem()
+        content_lines: list[str] = []
+
+        def _flush_item() -> None:
+            nonlocal current_item, content_lines
+            if not (
+                content_lines
+                or current_item.item_id
+                or current_item.topic
+                or current_item.has_author
+                or current_item.author
+            ):
+                current_item = SectionItem()
+                content_lines = []
+                return
+            current_item.content = normalize_text("\n".join(content_lines))
+            if (
+                current_item.content
+                or current_item.author
+                or current_item.topic
+                or current_item.has_author
+            ):
+                items.append(current_item)
+            current_item = SectionItem()
+            content_lines = []
+
+        while self.pos < len(self.lines):
+            line = self.lines[self.pos]
+            if line.startswith("## "):
+                break
+            if line.strip().startswith("<!-- TOML-LECTURERS:"):
+                break
+            if re.match(r"^- [^\s]", line):
+                break
+
+            comment_data = parse_toml_comment(line)
+            if comment_data.get("type") == "item":
+                _flush_item()
+                current_item = SectionItem()
+                if "id" in comment_data:
+                    current_item.item_id = comment_data["id"]
+                if "topic" in comment_data:
+                    current_item.topic = comment_data["topic"]
+                if comment_data.get("has_author") == "true":
+                    current_item.has_author = True
+                if comment_data.get("author_type") == "list":
+                    current_item.author_is_list = True
+                self.pos += 1
+                continue
+
+            parsed_author = parse_author_line(line)
+            if parsed_author is not None:
+                current_item.content = normalize_text("\n".join(content_lines))
+                if isinstance(parsed_author, list):
+                    current_item.author = parsed_author
+                elif current_item.author_is_list:
+                    current_item.author = [parsed_author]
+                else:
+                    current_item.author = parsed_author
+                if (
+                    current_item.content
+                    or current_item.author
+                    or current_item.topic
+                    or current_item.has_author
+                ):
+                    items.append(current_item)
+                current_item = SectionItem()
+                content_lines = []
+                self.pos += 1
+                continue
+
+            # Skip leading blank lines
+            if not line.strip() and not content_lines and not current_item.item_id:
+                self.pos += 1
+                continue
+
+            content_lines.append(line)
+            self.pos += 1
+
+        _flush_item()
+        return items
+
+    def _parse_lecturers_items_until_boundary(self) -> list[Lecturer]:
+        """Parse lecturer bullet list until next lecturers marker / next section."""
+
         lecturers: list[Lecturer] = []
         current_lecturer: Lecturer | None = None
         current_review: SectionItem | None = None
         content_lines: list[str] = []
 
-        def _flush_review():
-            """Flush accumulated content into a review for current lecturer."""
+        def _flush_review() -> None:
             nonlocal content_lines, current_review
             if current_lecturer is None:
                 return
             if current_review is not None:
                 current_review.content = normalize_text("\n".join(content_lines))
-                if current_review.content or current_review.author or current_review.has_author:
+                if (
+                    current_review.content
+                    or current_review.author
+                    or current_review.has_author
+                ):
                     current_lecturer.reviews.append(current_review)
                 current_review = None
             elif content_lines:
@@ -639,6 +850,8 @@ class MarkdownParser:
             line = self.lines[self.pos]
 
             if line.startswith("## "):
+                break
+            if line.strip().startswith("<!-- TOML-LECTURERS:"):
                 break
 
             # Check for TOML-ITEM comment
@@ -693,19 +906,25 @@ class MarkdownParser:
                     self.pos += 1
                     continue
 
-            # Further nested content (4+ spaces)
+            # Further nested content / author line (4+ spaces)
             if line.startswith("    "):
                 parsed_author = parse_author_line(line)
                 if parsed_author is not None and current_lecturer is not None:
                     if current_review is not None:
-                        current_review.content = normalize_text("\n".join(content_lines))
+                        current_review.content = normalize_text(
+                            "\n".join(content_lines)
+                        )
                         if isinstance(parsed_author, list):
                             current_review.author = parsed_author
                         elif current_review.author_is_list:
                             current_review.author = [parsed_author]
                         else:
                             current_review.author = parsed_author
-                        if current_review.content or current_review.author or current_review.has_author:
+                        if (
+                            current_review.content
+                            or current_review.author
+                            or current_review.has_author
+                        ):
                             current_lecturer.reviews.append(current_review)
                         current_review = None
                     else:
@@ -735,7 +954,11 @@ class MarkdownParser:
                         current_review.author = [parsed_author]
                     else:
                         current_review.author = parsed_author
-                    if current_review.content or current_review.author or current_review.has_author:
+                    if (
+                        current_review.content
+                        or current_review.author
+                        or current_review.has_author
+                    ):
                         current_lecturer.reviews.append(current_review)
                     current_review = None
                 else:
@@ -751,19 +974,22 @@ class MarkdownParser:
                 self.pos += 1
                 continue
 
-            # Empty line
             if not line.strip():
                 self.pos += 1
                 continue
 
             self.pos += 1
 
-        # Save last lecturer
         if current_lecturer:
             _flush_review()
             lecturers.append(current_lecturer)
 
         return lecturers
+
+    # Legacy parser kept for compatibility with old workflow / tests
+    def _parse_lecturers(self) -> list[Lecturer]:
+        """Parse lecturers section with nested reviews."""
+        return self._parse_lecturers_items_until_boundary()
 
     def _parse_multi_project(self):
         """Parse multi-project structure."""
@@ -773,7 +999,7 @@ class MarkdownParser:
         # Pre-scan: check if TOML-COURSES-START marker exists anywhere
         has_courses_marker = any(
             line.strip() == "<!-- TOML-COURSES-START -->"
-            for line in self.lines[self.pos:]
+            for line in self.lines[self.pos :]
         )
         courses_started = False
 
@@ -796,7 +1022,9 @@ class MarkdownParser:
                 # (fallback for human-edited READMEs that never had the marker).
                 if line.startswith("## ") and not has_courses_marker:
                     if description_lines:
-                        self.doc.description = normalize_text("\n".join(description_lines))
+                        self.doc.description = normalize_text(
+                            "\n".join(description_lines)
+                        )
                         description_lines = []
                     courses_started = True
                     # Do NOT advance self.pos — let the ## handler below pick it up
@@ -832,7 +1060,7 @@ class MarkdownParser:
                 if self.pos < len(self.lines):
                     m = re.match(
                         r'<!--\s*TOML-COURSE:\s*code="([^"]*)"\s*name="([^"]*)"\s*-->',
-                        self.lines[self.pos].strip()
+                        self.lines[self.pos].strip(),
                     )
                     if m:
                         current_course.code = m.group(1)
@@ -855,7 +1083,10 @@ class MarkdownParser:
 
                 # Check if next line is a TOML-COURSE-REVIEWS marker
                 is_reviews = False
-                if self.pos < len(self.lines) and self.lines[self.pos].strip() == "<!-- TOML-COURSE-REVIEWS -->":
+                if (
+                    self.pos < len(self.lines)
+                    and self.lines[self.pos].strip() == "<!-- TOML-COURSE-REVIEWS -->"
+                ):
                     is_reviews = True
                     self.pos += 1  # skip the marker
 
@@ -870,7 +1101,7 @@ class MarkdownParser:
 
                 section_title = sub_title
                 if prefix and sub_title.startswith(prefix):
-                    section_title = sub_title[len(prefix):]
+                    section_title = sub_title[len(prefix) :]
                 elif " - " in sub_title:
                     parts = sub_title.rsplit(" - ", 1)
                     section_title = parts[-1]
@@ -1069,7 +1300,9 @@ class MarkdownParser:
                 if content:
                     item["content"] = content
                 if isinstance(parsed_author, list):
-                    item["author"] = parsed_author[0] if len(parsed_author) == 1 else parsed_author
+                    item["author"] = (
+                        parsed_author[0] if len(parsed_author) == 1 else parsed_author
+                    )
                 else:
                     item["author"] = parsed_author
                 if item:
@@ -1204,7 +1437,9 @@ def generate_toml(doc: Document) -> str:
                     author = mi.get("author")
                     if author:
                         if isinstance(author, Author):
-                            lines.append(f"author = {format_toml_dict(author.to_toml())}")
+                            lines.append(
+                                f"author = {format_toml_dict(author.to_toml())}"
+                            )
                         elif isinstance(author, dict):
                             lines.append(f"author = {format_toml_dict(author)}")
 
@@ -1225,19 +1460,36 @@ def generate_toml(doc: Document) -> str:
         lines.append("[[sections.items]]")
         lines.append(f"content = {format_toml_string(chr(10).join(basic_info_items))}")
 
-    # Lecturers
-    if doc.lecturers:
+    # Lecturers (new schema)
+    if not doc.lecturers.is_empty():
         lines.append("")
-        for lec in doc.lecturers:
-            lines.append("[[lecturers]]")
+        lines.append("[lecturers]")
+
+        for it in doc.lecturers.intro:
+            lines.append("")
+            lines.append("[[lecturers.intro]]")
+            if it.content:
+                lines.append(f"content = {format_toml_string(it.content)}")
+            _append_author_lines(lines, it)
+
+        for lec in doc.lecturers.items:
+            lines.append("")
+            lines.append("[[lecturers.items]]")
             lines.append(f"name = {format_toml_string(lec.name)}")
 
             for review in lec.reviews:
                 lines.append("")
-                lines.append("[[lecturers.reviews]]")
+                lines.append("[[lecturers.items.reviews]]")
                 if review.content:
                     lines.append(f"content = {format_toml_string(review.content)}")
                 _append_author_lines(lines, review)
+
+        for it in doc.lecturers.summary:
+            lines.append("")
+            lines.append("[[lecturers.summary]]")
+            if it.content:
+                lines.append(f"content = {format_toml_string(it.content)}")
+            _append_author_lines(lines, it)
 
     # Sections
     for section in doc.sections:
@@ -1336,7 +1588,7 @@ def main() -> int:
             if args.verbose:
                 print(f"  Course: {doc.course_code} - {doc.course_name}")
                 print(f"  Sections: {len(doc.sections)}")
-                print(f"  Lecturers: {len(doc.lecturers)}")
+                print(f"  Lecturers: {len(doc.lecturers.items)}")
 
         except Exception as e:
             print(f"Error processing {md_path}: {e}", file=sys.stderr)

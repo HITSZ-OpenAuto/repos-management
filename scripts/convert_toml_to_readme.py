@@ -75,7 +75,9 @@ def _encode_shields_component(text: str) -> str:
     return s
 
 
-def _render_shields_badge(*, alt: str, label: str, message: str | None = None, color: str | None = None) -> str:
+def _render_shields_badge(
+    *, alt: str, label: str, message: str | None = None, color: str | None = None
+) -> str:
     base = "https://img.shields.io/badge/"
     if message is None and color is not None:
         path = f"{_encode_shields_component(label)}-{_encode_shields_component(color)}"
@@ -134,7 +136,9 @@ def _load_grades_summary(toml_path: Path) -> dict:
     - from the input toml path upwards (for local runs)
     """
 
-    path = _find_upwards(Path.cwd(), "grades_summary.toml") or _find_upwards(toml_path, "grades_summary.toml")
+    path = _find_upwards(Path.cwd(), "grades_summary.toml") or _find_upwards(
+        toml_path, "grades_summary.toml"
+    )
     if not path:
         return {}
     cached = _GRADES_SUMMARY_CACHE.get(path)
@@ -194,21 +198,33 @@ def _render_grading_badges_from_grade_string(grade: str) -> list[str]:
     if not grade:
         return []
 
-    parts = [p.strip() for p in re.split(r"\s*\|\s*|(?<=[0-9%])\s*\+\s*", grade) if p.strip()]
+    parts = [
+        p.strip() for p in re.split(r"\s*\|\s*|(?<=[0-9%])\s*\+\s*", grade) if p.strip()
+    ]
     if not parts:
         return []
 
-    badges: list[str] = [_render_shields_badge(alt="成绩构成", label="成绩构成", message=None, color="gold")]
+    badges: list[str] = [
+        _render_shields_badge(
+            alt="成绩构成", label="成绩构成", message=None, color="gold"
+        )
+    ]
     for seg in parts:
         label, value = _split_label_value_tail(seg)
         if not label:
             continue
         alt = f"{label}{value}" if value else label
-        badges.append(_render_shields_badge(alt=alt, label=label, message=value or "", color="wheat"))
+        badges.append(
+            _render_shields_badge(
+                alt=alt, label=label, message=value or "", color="wheat"
+            )
+        )
     return badges
 
 
-def _render_basic_info_badges(content: str, *, fallback_grading_badges: list[str]) -> list[str]:
+def _render_basic_info_badges(
+    content: str, *, fallback_grading_badges: list[str]
+) -> list[str]:
     text = _normalize_multiline_md(content)
     if not text:
         return fallback_grading_badges
@@ -228,25 +244,45 @@ def _render_basic_info_badges(content: str, *, fallback_grading_badges: list[str
 
     credit = kv.get("学分")
     if credit:
-        badges.append(_render_shields_badge(alt="学分", label="学分", message=credit, color="moccasin"))
+        badges.append(
+            _render_shields_badge(
+                alt="学分", label="学分", message=credit, color="moccasin"
+            )
+        )
 
     hours = kv.get("学时构成") or kv.get("学时分布")
     if hours:
         ensure_blank_sep()
-        badges.append(_render_shields_badge(alt="学时构成", label="学时构成", message=None, color="gold"))
+        badges.append(
+            _render_shields_badge(
+                alt="学时构成", label="学时构成", message=None, color="gold"
+            )
+        )
         for seg in [p.strip() for p in hours.split("|") if p.strip()]:
             label, value = _split_label_value_tail(seg)
             alt = f"{label}{value}" if value else label
-            badges.append(_render_shields_badge(alt=alt, label=label, message=value or "", color="wheat"))
+            badges.append(
+                _render_shields_badge(
+                    alt=alt, label=label, message=value or "", color="wheat"
+                )
+            )
 
     grading = kv.get("成绩构成")
     if grading:
         ensure_blank_sep()
-        badges.append(_render_shields_badge(alt="成绩构成", label="成绩构成", message=None, color="gold"))
+        badges.append(
+            _render_shields_badge(
+                alt="成绩构成", label="成绩构成", message=None, color="gold"
+            )
+        )
         for seg in [p.strip() for p in grading.split("|") if p.strip()]:
             label, value = _split_label_value_tail(seg)
             alt = f"{label}{value}" if value else label
-            badges.append(_render_shields_badge(alt=alt, label=label, message=value or "", color="wheat"))
+            badges.append(
+                _render_shields_badge(
+                    alt=alt, label=label, message=value or "", color="wheat"
+                )
+            )
     elif fallback_grading_badges:
         ensure_blank_sep()
         badges.extend(fallback_grading_badges)
@@ -303,7 +339,12 @@ def _listify_md_lines(lines: list[str], *, indent: str) -> list[str]:
     return out
 
 
-def _render_lecturers(lecturers: Any) -> list[str]:
+def _render_lecturers_legacy(lecturers: Any) -> list[str]:
+    """Render legacy schema:
+
+    [[lecturers]] / [[lecturers.reviews]]
+    """
+
     lec_list = [x for x in _as_list(lecturers) if isinstance(x, dict)]
     if not lec_list:
         return []
@@ -329,7 +370,9 @@ def _render_lecturers(lecturers: Any) -> list[str]:
             elif isinstance(author, dict) and not _render_author(author):
                 # Empty author dict - preserve with comment
                 author_meta = ' has_author="true"'
-            lines.append(f'  <!-- TOML-ITEM: id="review-{name}-{ri+1}"{author_meta} -->')
+            lines.append(
+                f'  <!-- TOML-ITEM: id="review-{name}-{ri + 1}"{author_meta} -->'
+            )
 
             content_lines = content.split("\n") if content else []
             bullet_lines = _listify_md_lines(content_lines, indent="  ")
@@ -343,6 +386,105 @@ def _render_lecturers(lecturers: Any) -> list[str]:
                 lines.append(aq)
 
     return lines
+
+
+def _render_lecturers_v2(lecturers: dict) -> list[str]:
+    """Render new schema:
+
+    [lecturers]
+      [[lecturers.intro]]
+      [[lecturers.items]] / [[lecturers.items.reviews]]
+      [[lecturers.summary]]
+    """
+
+    intro_items = [x for x in _as_list(lecturers.get("intro")) if isinstance(x, dict)]
+    lec_list = [x for x in _as_list(lecturers.get("items")) if isinstance(x, dict)]
+    summary_items = [
+        x for x in _as_list(lecturers.get("summary")) if isinstance(x, dict)
+    ]
+
+    if not intro_items and not lec_list and not summary_items:
+        return []
+
+    lines: list[str] = ["## 授课教师", ""]
+
+    def render_free_items(items: list[dict], *, part: str) -> None:
+        if not items:
+            return
+        lines.append(f'<!-- TOML-LECTURERS: part="{part}" -->')
+        for i, it in enumerate(items):
+            content = _norm_block(it.get("content"))
+            author = it.get("author")
+            if not content and not author:
+                continue
+
+            # Author meta for round-trip
+            meta = ""
+            if isinstance(author, list):
+                meta = ' author_type="list"'
+            elif isinstance(author, dict) and not _render_author(author):
+                meta = ' has_author="true"'
+
+            lines.append("")
+            lines.append(f'<!-- TOML-ITEM: id="lecturers-{part}-{i + 1}"{meta} -->')
+            if content:
+                lines.append("")
+                lines.append(content)
+            aq = _render_author(author)
+            if aq:
+                lines.append("")
+                lines.append(aq)
+        lines.append("")
+
+    render_free_items(intro_items, part="intro")
+
+    # Lecturer list
+    if lec_list:
+        lines.append('<!-- TOML-LECTURERS: part="items" -->')
+        for lec in lec_list:
+            name = _s(lec.get("name")).strip()
+            if not name:
+                continue
+            lines.append(f"- {name}")
+
+            reviews = [x for x in _as_list(lec.get("reviews")) if isinstance(x, dict)]
+            for ri, rv in enumerate(reviews):
+                content = _norm_block(rv.get("content"))
+                author = rv.get("author")
+                if not content and not author:
+                    continue
+
+                author_meta = ""
+                if isinstance(author, list):
+                    author_meta = ' author_type="list"'
+                elif isinstance(author, dict) and not _render_author(author):
+                    author_meta = ' has_author="true"'
+                lines.append(
+                    f'  <!-- TOML-ITEM: id="review-{name}-{ri + 1}"{author_meta} -->'
+                )
+
+                content_lines = content.split("\n") if content else []
+                bullet_lines = _listify_md_lines(content_lines, indent="  ")
+                if bullet_lines:
+                    lines.extend(bullet_lines)
+                else:
+                    lines.append("  -")
+
+                aq = _render_author(author, indent="    ")
+                if aq:
+                    lines.append(aq)
+
+    render_free_items(summary_items, part="summary")
+
+    while lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _render_lecturers(lecturers: Any) -> list[str]:
+    if isinstance(lecturers, dict):
+        return _render_lecturers_v2(lecturers)
+    return _render_lecturers_legacy(lecturers)
 
 
 def _render_teachers_with_reviews(teachers: Any) -> list[str]:
@@ -413,7 +555,9 @@ def _extract_basic_info_from_sections(
 
     if not contents:
         return (fallback_grading_badges, kept)
-    badges = _render_basic_info_badges("\n".join(contents), fallback_grading_badges=fallback_grading_badges)
+    badges = _render_basic_info_badges(
+        "\n".join(contents), fallback_grading_badges=fallback_grading_badges
+    )
     return (badges, kept)
 
 
@@ -473,27 +617,27 @@ def _render_sections_schema(data: dict, *, grades_summary: dict | None = None) -
         lines.append(f"## {title}")
         # Add TOML section comment placeholder for bidirectional sync
         lines.append(f'<!-- TOML-SECTION: title="{title}" -->')
-        
+
         for i, it in enumerate(items):
             content = it["content"]
             author = it["author"]
             topic = it.get("topic", "")
-            
+
             # Build TOML-ITEM comment with all metadata
-            toml_item_parts = [f'id="item-{title}-{i+1}"']
+            toml_item_parts = [f'id="item-{title}-{i + 1}"']
             if topic:
                 toml_item_parts.append(f'topic="{topic}"')
-            
+
             # Track author type for round-trip
             if isinstance(author, list):
                 toml_item_parts.append('author_type="list"')
             elif isinstance(author, dict) and not _render_author(author):
                 toml_item_parts.append('has_author="true"')
-            
+
             # Always add TOML-ITEM comment to preserve metadata
             lines.append("")
-            lines.append(f'<!-- TOML-ITEM: {" ".join(toml_item_parts)} -->')
-            
+            lines.append(f"<!-- TOML-ITEM: {' '.join(toml_item_parts)} -->")
+
             if content:
                 lines.append("")
                 lines.append(content)
@@ -591,6 +735,7 @@ def render_multi_project(data: dict, *, grades_summary: dict | None = None) -> s
         reviews = [x for x in _as_list(c.get("reviews")) if isinstance(x, dict)]
         if reviews:
             from collections import OrderedDict
+
             groups: OrderedDict[str, list[dict]] = OrderedDict()
             for rev in reviews:
                 topic = _s(rev.get("topic")).strip() or "评价"
@@ -658,11 +803,19 @@ def _default_out_path(input_path: Path) -> Path:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Convert readme.toml to README.md (minimal).")
+    p = argparse.ArgumentParser(
+        description="Convert readme.toml to README.md (minimal)."
+    )
     g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--all", action="store_true", help="Convert ./final/**/readme.toml -> ./final/**/README.md")
+    g.add_argument(
+        "--all",
+        action="store_true",
+        help="Convert ./final/**/readme.toml -> ./final/**/README.md",
+    )
     g.add_argument("--input", "-i", help="Input TOML file or a directory to scan")
-    p.add_argument("--output", "-o", help="Output path (only valid when --input is a single file)")
+    p.add_argument(
+        "--output", "-o", help="Output path (only valid when --input is a single file)"
+    )
     p.add_argument("--overwrite", action="store_true", help="Overwrite existing README")
     args = p.parse_args()
 
@@ -679,7 +832,9 @@ def main() -> int:
         if out.exists() and not args.overwrite:
             continue
         data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
-        out.write_text(render_readme(data, toml_path=toml_path), encoding="utf-8", newline="\n")
+        out.write_text(
+            render_readme(data, toml_path=toml_path), encoding="utf-8", newline="\n"
+        )
 
     return 0
 
