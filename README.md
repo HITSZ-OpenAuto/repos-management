@@ -1,85 +1,184 @@
 <div align="center">
 
-# Organization Repository Management Scripts
+# repos-management
+
+Tooling for managing course repositories in **HITSZ-OpenAuto**.
 
 [English](README.md) | [中文](README.zh-CN.md)
 
 </div>
 
-<br>
+---
 
-The scripts in this repository are designed to manage repositories within an organization, specifically for the HITSZ-OpenAuto organization. They facilitate tasks such as fetching repository names, approving pull requests, adding workflows, and managing licenses and secrets.
+## What this repo does
 
-## Environment Requirements
+This repository provides:
 
-- Operating System: Linux
-- Tool Dependencies:
-  - Git
-  - [GitHub CLI](https://cli.github.com/)
-  - Python 3 (Recommended 3.9 or higher)
+- A **single CLI** entrypoint for common operations:
+  - Convert `readme.toml` ⇄ `README.md`
+  - Bulk-trigger course repositories GitHub Actions workflows
+  - Fetch and maintain the organization repositories list (`repos_list.txt`)
+- The **reusable GitHub Actions workflow** used by course repositories to generate/update their worktrees.
 
-## Create Personal Access Token
+The preferred way to use this repo is:
 
-1. Log in to GitHub CLI
+```bash
+python3 -m repos_management --help
+```
 
-    ```bash
-    gh auth login
-    ```
+---
 
-2. Create a Token in GitHub: <https://github.com/settings/tokens/new>
+## Requirements
 
-3. Required Permissions: At least `repo` and `workflow`
+- Python **3.11+**
+- Optional (recommended): [GitHub CLI](https://cli.github.com/) (`gh`)
 
-4. Export an environment variable on macOS or Linux systems
+---
 
-   ```bash
-   export PERSONAL_ACCESS_TOKEN=<your_token_here>
-   ```
+## Quickstart
 
-5. To run a shell script, use the following command format:
+### 1) Convert TOML → README
 
-   ```bash
-   bash ./scripts/<script_name>.sh
-   ```
+```bash
+python3 -m repos_management rdme toml2md --input path/to/readme.toml --overwrite
+```
 
-## Script Documentation
+### 2) Convert README → TOML
 
-### fetch_repos.py
+```bash
+python3 -m repos_management rdme md2toml --input path/to/README.md --overwrite
+```
 
-Fetch all repository names (excluding 'HITSZ-OpenAuto', '.github', and 'hoa-moe')
+### 3) Trigger all course repositories workflows
 
-### repos_list.txt
+```bash
+python3 -m repos_management workflow trigger --delay 2
+```
 
-List of all repositories in the organization
+Dry-run:
 
-- Note: Line endings should be LF (Linux newline character)
+```bash
+python3 -m repos_management workflow trigger --dry-run
+```
 
-### approve_pr.sh
+---
 
-Batch approve the latest PRs for all repositories listed in [`repos_list.txt`](./repos_list.txt)
+## Authentication
 
-- Typically used for updating repository workflows
+### `workflow trigger`
 
-### add_workflow.sh
+- Uses `GITHUB_TOKEN` if set.
+- Otherwise falls back to `gh auth token`.
 
-Batch add/overwrite workflow files for all repositories listed in [`repos_list.txt`](./repos_list.txt). The workflow content is sourced from the root-level `call_worktree_update.yml` in the online repository `HITSZ-OpenAuto/repos-management`
+The token must be able to dispatch workflows (typical scopes: `repo`, `workflow`).
 
-### pull_or_clone.py
+### `repos fetch`
 
-Perform the following for all repositories:
+- Uses `PERSONAL_ACCESS_TOKEN` from env or `.env`.
+- You can also pass `--token` explicitly.
 
-- If the local folder exists → Pull the main branch
-- If the folder doesn't exist → Clone the repository
-- Exclude specific repositories using the `bypass_list` list
+Typical scopes: `read:org`, `repo`.
 
-### collect_worktree_info.sh
+---
 
-Collect repository file information (including filenames, sizes, and modification times), saved as a `.json` formatted file
+## CLI reference
 
-### add_licenses.py
+### `rdme toml2md`
 
-Batch add license files to all repositories listed in [`repos_list.txt`](./repos_list.txt)
+Convert `readme.toml` → `README.md`.
 
-### add_secrets.py
+```bash
+python3 -m repos_management rdme toml2md --input <file-or-dir> [--output <file>] [--overwrite]
+```
 
-Batch add Secrets to all repositories listed in [`repos_list.txt`](./repos_list.txt)
+- If `--input` is a directory, it scans `**/readme.toml` and writes `README.md` next to each file.
+
+### `rdme md2toml`
+
+Convert `README.md` → `readme.toml`.
+
+```bash
+python3 -m repos_management rdme md2toml --input <file-or-dir> [--output <file>] [--overwrite] [--verbose]
+```
+
+- If `--input` is a directory, it scans `**/README.md` and writes `readme.toml` next to each file.
+
+### `workflow trigger`
+
+Trigger each course repo workflow file (default: `trigger-workflow.yml`) via `workflow_dispatch`.
+
+```bash
+python3 -m repos_management workflow trigger \
+  --org HITSZ-OpenAuto \
+  --repos-file repos_list.txt \
+  --workflow-file trigger-workflow.yml \
+  --ref main \
+  --delay 2
+```
+
+### `repos fetch`
+
+Fetch repositories under an org and write `repos_list.txt`.
+
+```bash
+python3 -m repos_management repos fetch --org HITSZ-OpenAuto
+```
+
+---
+
+## Lecturers TOML schema (breaking change)
+
+Only the **new** lecturers schema is supported:
+
+```toml
+[lecturers]
+
+[[lecturers.intro]]
+content = "..."  # optional
+# author is optional
+# author = { name = "", link = "", date = "" }
+
+[[lecturers.items]]
+name = "郑宜峰"
+
+[[lecturers.items.reviews]]
+content = "挺好的老师，交流时感觉很亲切。"
+# author is optional
+# author = { name = "xxx", link = "xxx", date = "xxx" }
+
+[[lecturers.summary]]
+content = "..."  # optional
+```
+
+Legacy TOML `[[lecturers]]` / `[[lecturers.reviews]]` is **not supported** and will raise an error.
+
+---
+
+## How course repositories CI works (high-level)
+
+A typical course repository contains:
+
+- `.github/workflows/trigger-workflow.yml`
+
+This workflow calls the reusable workflow in this repo:
+
+```yaml
+uses: HITSZ-OpenAuto/repos-management/.github/workflows/reusable_worktree_generate.yml@main
+```
+
+To update all course repositories after `repos-management` changes are merged to `main`, run:
+
+```bash
+python3 -m repos_management workflow trigger
+```
+
+---
+
+## Maintenance scripts
+
+Some power tools remain in `./scripts/` (use with care):
+
+- `approve_pr.sh`, `close_pr.sh`
+- `delete_dir.sh`, `batch_delete.sh`
+- `generate_worktree_info.py`
+- `rdme_autogen.py` (used by course repositories CI to orchestrate conversion)

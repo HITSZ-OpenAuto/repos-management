@@ -339,55 +339,6 @@ def _listify_md_lines(lines: list[str], *, indent: str) -> list[str]:
     return out
 
 
-def _render_lecturers_legacy(lecturers: Any) -> list[str]:
-    """Render legacy schema:
-
-    [[lecturers]] / [[lecturers.reviews]]
-    """
-
-    lec_list = [x for x in _as_list(lecturers) if isinstance(x, dict)]
-    if not lec_list:
-        return []
-
-    lines: list[str] = ["## 授课教师", ""]
-    for lec in lec_list:
-        name = _s(lec.get("name")).strip()
-        if not name:
-            continue
-        lines.append(f"- {name}")
-
-        reviews = [x for x in _as_list(lec.get("reviews")) if isinstance(x, dict)]
-        for ri, rv in enumerate(reviews):
-            content = _norm_block(rv.get("content"))
-            author = rv.get("author")
-            if not content and not author:
-                continue
-
-            # Add TOML-ITEM comment for round-trip preservation
-            author_meta = ""
-            if isinstance(author, list):
-                author_meta = ' author_type="list"'
-            elif isinstance(author, dict) and not _render_author(author):
-                # Empty author dict - preserve with comment
-                author_meta = ' has_author="true"'
-            lines.append(
-                f'  <!-- TOML-ITEM: id="review-{name}-{ri + 1}"{author_meta} -->'
-            )
-
-            content_lines = content.split("\n") if content else []
-            bullet_lines = _listify_md_lines(content_lines, indent="  ")
-            if bullet_lines:
-                lines.extend(bullet_lines)
-            else:
-                lines.append("  -")
-
-            aq = _render_author(author, indent="    ")
-            if aq:
-                lines.append(aq)
-
-    return lines
-
-
 def _render_lecturers_v2(lecturers: dict) -> list[str]:
     """Render new schema:
 
@@ -482,9 +433,28 @@ def _render_lecturers_v2(lecturers: dict) -> list[str]:
 
 
 def _render_lecturers(lecturers: Any) -> list[str]:
-    if isinstance(lecturers, dict):
-        return _render_lecturers_v2(lecturers)
-    return _render_lecturers_legacy(lecturers)
+    """Render lecturers section.
+
+    Supported schema (required):
+
+    [lecturers]
+      [[lecturers.intro]]
+      [[lecturers.items]] / [[lecturers.items.reviews]]
+      [[lecturers.summary]]
+
+    Legacy [[lecturers]] is NOT supported.
+    """
+
+    if not lecturers:
+        return []
+
+    if not isinstance(lecturers, dict):
+        raise ValueError(
+            "Unsupported legacy lecturers schema: expected [lecturers] table; "
+            "please migrate to lecturers.items/lecturers.items.reviews"
+        )
+
+    return _render_lecturers_v2(lecturers)
 
 
 def _render_teachers_with_reviews(teachers: Any) -> list[str]:

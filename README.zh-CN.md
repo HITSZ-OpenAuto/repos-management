@@ -1,83 +1,184 @@
 <div align="center">
 
-# 组织仓库管理脚本
+# repos-management
+
+用于管理 **HITSZ-OpenAuto** 组织下课程仓库的工具集。
 
 [中文](README.zh-CN.md) | [English](README.md)
 
 </div>
 
-该仓库中的脚本旨在管理组织内的仓库，特别是 HITSZ-OpenAuto 组织。它们简化了获取仓库名称、批准拉取请求、添加工作流以及管理许可证和密钥等任务。
+---
+
+## 本仓库做什么
+
+本仓库提供：
+
+- 一个统一的 **Python CLI** 入口，用于常用操作：
+  - `readme.toml` ⇄ `README.md` 双向转换
+  - 批量触发课程仓库 GitHub Actions workflows
+  - 获取/维护组织仓库列表（`repos_list.txt`）
+- 课程仓库用于生成/更新 worktree 的 **reusable GitHub Actions workflow**。
+
+推荐使用方式：
+
+```bash
+python3 -m repos_management --help
+```
+
+---
 
 ## 环境要求
 
-- 操作系统：Linux
-- 工具依赖：
-  - Git
-  - [GitHub CLI](https://cli.github.com/)
-  - Python 3（推荐 3.9 及以上）
+- Python **3.11+**
+- 可选（推荐）：[GitHub CLI](https://cli.github.com/)（`gh`）
 
-## 创建 Personal Access Token
+---
 
-1. 登录 GitHub CLI
+## 快速开始
 
-    ```bash
-    gh auth login
-    ```
+### 1) TOML → README
 
-2. 在 GitHub 中创建 Token：<https://github.com/settings/tokens/new>
+```bash
+python3 -m repos_management rdme toml2md --input path/to/readme.toml --overwrite
+```
 
-3. 权限要求：至少包含 `repo` 和 `workflow`
+### 2) README → TOML
 
-4. 在 macOS 或 Linux 系统上导出环境变量
+```bash
+python3 -m repos_management rdme md2toml --input path/to/README.md --overwrite
+```
 
-   ```bash
-   export PERSONAL_ACCESS_TOKEN=<your_token_here>
-   ```
+### 3) 批量触发所有课程仓库 workflow
 
-5. 要运行 shell 脚本，请使用以下命令格式：
+```bash
+python3 -m repos_management workflow trigger --delay 2
+```
 
-   ```bash
-   bash ./scripts/<script_name>.sh
-   ```
+只预览不执行：
 
-## 脚本说明
+```bash
+python3 -m repos_management workflow trigger --dry-run
+```
 
-### fetch_repos.py
+---
 
-获取所有仓库名（排除 'HITSZ-OpenAuto'、'.github' 与 'hoa-moe'）
+## 认证（Token）
 
-### repos_list.txt
+### `workflow trigger`
 
-组织下所有仓库的列表
+- 优先使用环境变量 `GITHUB_TOKEN`
+- 若未设置，则尝试使用 `gh auth token`
 
-- 注意：行尾序列应为 LF（Linux 换行符）
+token 需要能够 dispatch workflow（常见 scope：`repo`, `workflow`）。
 
-### approve_pr.sh
+### `repos fetch`
 
-批量批准 [`repos_list.txt`](./repos_list.txt) 下所有仓库的最新 PR
+- 默认读取环境变量/`.env` 中的 `PERSONAL_ACCESS_TOKEN`
+- 也可通过 `--token` 显式传入
 
-- 通常用于更新仓库的 workflow 等
+常见 scope：`read:org`, `repo`。
 
-### add_workflow.sh
+---
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加/覆写 workflow 文件。文件内容来自线上仓库 `HITSZ-OpenAuto/repos-management` 根目录下的 `call_worktree_update.yml` 文件
+## CLI 参考
 
-### pull_or_clone.py
+### `rdme toml2md`
 
-对所有仓库执行：
+将 `readme.toml` 转换为 `README.md`。
 
-- 若本地存在对应文件夹 → 拉取主分支
-- 若不存在 → 克隆仓库
-- 可通过 `bypass_list` 列表指定排除的仓库
+```bash
+python3 -m repos_management rdme toml2md --input <文件或目录> [--output <文件>] [--overwrite]
+```
 
-### collect_worktree_info.sh
+- 若 `--input` 是目录，会扫描 `**/readme.toml`，并在同目录生成 `README.md`
 
-收集仓库文件信息（含文件名、大小、修改时间等），保存为 `.json` 格式文件
+### `rdme md2toml`
 
-### add_licenses.py
+将 `README.md` 转换为 `readme.toml`。
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加许可证文件
+```bash
+python3 -m repos_management rdme md2toml --input <文件或目录> [--output <文件>] [--overwrite] [--verbose]
+```
 
-### add_secrets.py
+- 若 `--input` 是目录，会扫描 `**/README.md`，并在同目录生成 `readme.toml`
 
-批量为 [`repos_list.txt`](./repos_list.txt) 下所有仓库添加 Secrets
+### `workflow trigger`
+
+对每个课程仓库的 workflow（默认：`trigger-workflow.yml`）发起 `workflow_dispatch`：
+
+```bash
+python3 -m repos_management workflow trigger \
+  --org HITSZ-OpenAuto \
+  --repos-file repos_list.txt \
+  --workflow-file trigger-workflow.yml \
+  --ref main \
+  --delay 2
+```
+
+### `repos fetch`
+
+拉取组织下仓库列表并写入 `repos_list.txt`。
+
+```bash
+python3 -m repos_management repos fetch --org HITSZ-OpenAuto
+```
+
+---
+
+## lecturers TOML 结构（破坏性变更）
+
+仅支持 **新版** lecturers 结构：
+
+```toml
+[lecturers]
+
+[[lecturers.intro]]
+content = "..."  # 可选
+# author 可选
+# author = { name = "", link = "", date = "" }
+
+[[lecturers.items]]
+name = "郑宜峰"
+
+[[lecturers.items.reviews]]
+content = "挺好的老师，交流时感觉很亲切。"
+# author 可选
+# author = { name = "xxx", link = "xxx", date = "xxx" }
+
+[[lecturers.summary]]
+content = "..."  # 可选
+```
+
+旧版 `[[lecturers]]` / `[[lecturers.reviews]]` **不再支持**，会直接报错。
+
+---
+
+## 课程仓库 CI 工作方式（概览）
+
+典型课程仓库包含：
+
+- `.github/workflows/trigger-workflow.yml`
+
+它会调用本仓库的 reusable workflow：
+
+```yaml
+uses: HITSZ-OpenAuto/repos-management/.github/workflows/reusable_worktree_generate.yml@main
+```
+
+当 `repos-management` 的改动合并到 `main` 后，如需让所有课程仓库更新，可运行：
+
+```bash
+python3 -m repos_management workflow trigger
+```
+
+---
+
+## 维护脚本
+
+部分“强力工具”仍保留在 `./scripts/` 下（谨慎使用）：
+
+- `approve_pr.sh`, `close_pr.sh`
+- `delete_dir.sh`, `batch_delete.sh`
+- `generate_worktree_info.py`
+- `rdme_autogen.py`（课程仓库 CI 中用于编排转换流程）
