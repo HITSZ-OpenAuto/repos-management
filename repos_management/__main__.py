@@ -82,7 +82,9 @@ def cmd_workflow_trigger(ns: argparse.Namespace) -> int:
     if not repos_file.is_file():
         raise SystemExit(f"repos file not found: {repos_file}")
 
-    token = _get_github_token()
+    token = ""
+    if not ns.dry_run:
+        token = _get_github_token()
 
     total = 0
     success = 0

@@ -176,9 +176,29 @@ python3 -m repos_management workflow trigger
 
 ## 维护脚本
 
-部分“强力工具”仍保留在 `./scripts/` 下（谨慎使用）：
+强力工具保留在 `./scripts/` 下，**不保证是稳定 CLI 接口**（默认不纳入 `python3 -m repos_management` 的子命令）。
 
-- `approve_pr.sh`, `close_pr.sh`
-- `delete_dir.sh`, `batch_delete.sh`
-- `generate_worktree_info.py`
-- `rdme_autogen.py`（课程仓库 CI 中用于编排转换流程）
+| 脚本 | 用途 | 依赖 | 风险 |
+|---|---|---|---|
+| `rdme_autogen.py` | 课程仓库 CI 中的执行器：从本仓库下载转换器并执行双向同步逻辑。 | 课程仓库内 `git`；可选 `taplo` | 低 |
+| `generate_worktree_info.py` | 生成 worktree 元数据 JSON 并推送到 `worktree` 分支（组织自动化会用）。 | `git` + 需要 push 权限 | 中 |
+| `approve_pr.sh` | 批量 **approve + squash merge + 删除分支**：对每个仓库标题包含 `[automated-generated-pr]` 的最新 PR 执行。 | 已登录 `gh`；需要管理员合并权限 | 高 |
+| `close_pr.sh` | 批量关闭标题包含 `[automated-generated-pr]` 的 PR 并删除分支。 | 已登录 `gh` | 高 |
+| `delete_dir.sh` | **无需 clone** 即删除仓库内目录（GraphQL `createCommitOnBranch`）并创建 PR。 | `gh`, `jq` | 高 |
+| `batch_delete.sh` | 读取 `repos_list.txt` 批量调用 `delete_dir.sh`（带超时和汇总）。 | `bash`, `timeout` + `delete_dir.sh` 依赖 | 高 |
+
+### 示例
+
+批准并合并所有自动化 PR：
+
+```bash
+bash scripts/approve_pr.sh
+```
+
+批量删除各课程仓库的 `.hoa/` 目录（创建 PR）：
+
+```bash
+bash scripts/batch_delete.sh HITSZ-OpenAuto main .hoa
+```
+
+> 注意：这些脚本会对大量仓库生效，建议先挑少量仓库测试或先读脚本确认参数。

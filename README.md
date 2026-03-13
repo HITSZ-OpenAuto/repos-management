@@ -176,9 +176,29 @@ python3 -m repos_management workflow trigger
 
 ## Maintenance scripts
 
-Some power tools remain in `./scripts/` (use with care):
+Power tools are kept under `./scripts/`. They are **intentionally not** exposed as stable CLI commands.
 
-- `approve_pr.sh`, `close_pr.sh`
-- `delete_dir.sh`, `batch_delete.sh`
-- `generate_worktree_info.py`
-- `rdme_autogen.py` (used by course repositories CI to orchestrate conversion)
+| Script | Purpose | Requirements | Risk |
+|---|---|---|---|
+| `rdme_autogen.py` | Runner used inside course repos CI. Downloads canonical converters from this repo and applies bidirectional sync logic. | `git` in course repo; optional `taplo` | Low |
+| `generate_worktree_info.py` | Generate and push worktree metadata JSON to the `worktree` branch (used by org automation). | `git` + push permission | Medium |
+| `approve_pr.sh` | Bulk **approve + squash-merge + delete branch** for latest PR matching `[automated-generated-pr]` in each repo. | `gh` authenticated; admin merge permission | High |
+| `close_pr.sh` | Bulk close PR matching `[automated-generated-pr]` and delete its branch. | `gh` authenticated | High |
+| `delete_dir.sh` | Delete a directory from a repo **without cloning** (GraphQL `createCommitOnBranch`) and open a PR. | `gh`, `jq` | High |
+| `batch_delete.sh` | Run `delete_dir.sh` across `repos_list.txt` with timeout + summary. | `bash`, `timeout`, plus `delete_dir.sh` deps | High |
+
+### Examples
+
+Approve all automated PRs:
+
+```bash
+bash scripts/approve_pr.sh
+```
+
+Delete `.hoa/` directory across course repos (opens PRs):
+
+```bash
+bash scripts/batch_delete.sh HITSZ-OpenAuto main .hoa
+```
+
+> NOTE: These scripts operate on many repositories. Always dry-run or test on a small subset first.
