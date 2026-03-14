@@ -55,17 +55,6 @@ class Author:
         """Convert to TOML dict format."""
         return {"name": self.name, "link": self.link, "date": self.date}
 
-    @classmethod
-    def from_toml(cls, data: dict | str) -> "Author":
-        """Create from TOML data."""
-        if isinstance(data, str):
-            return cls(name=data)
-        return cls(
-            name=data.get("name", ""),
-            link=data.get("link", ""),
-            date=data.get("date", ""),
-        )
-
 
 @dataclass
 class SectionItem:
