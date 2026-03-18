@@ -91,7 +91,7 @@ jobs:
           fi
 
           # Prevent this automated push from re-triggering workflows.
-          git commit -m "ci: bidirectional sync toml <-> README [automated] [skip ci]"
+          git commit -m "ci: sync readme and readme.toml"
 
           # Push without rebase. If main moved meanwhile, retry once by
           # resetting to the latest main and re-running RDME.
