@@ -40,8 +40,7 @@ def get_repos(org_name, access_token):
 def main():
     repos = get_repos(ORG_NAME, PERSONAL_ACCESS_TOKEN)
     with Path("repos_list.txt").open("w") as f:
-        for repo in repos:
-            f.write(f"{repo}\n")
+        f.write("\n".join(repos) + "\n")
 
 
 if __name__ == "__main__":
