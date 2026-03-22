@@ -1,16 +1,21 @@
 import base64
+import os
 
 import requests
+from dotenv import load_dotenv
+
+# Load the environment variables from the .env file
+load_dotenv()
 
 # GitHub API base URL
 base_url = "https://api.github.com"
 
 # Your GitHub username and personal access token
-username = "your_username"
-token = "your_token"
+username = os.getenv("GITHUB_USERNAME")
+token = os.getenv("PERSONAL_ACCESS_TOKEN")
 
 # Organization name
-org_name = "your org"
+org_name = os.getenv("ORG_NAME")
 
 # URL of the license file
 license_url = (
