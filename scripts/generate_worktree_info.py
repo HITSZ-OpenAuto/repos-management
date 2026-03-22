@@ -35,17 +35,6 @@ def cmd(cmds, cwd=None, allow_fail=False) -> bytes:
             sys.exit(1)
 
 
-def return_code(cmds) -> int:
-    logger.debug(f"test: {cmds}")
-    result = subprocess.run(
-        cmds,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        text=False,
-    )
-    return result.returncode
-
-
 def is_digit_in_ascii(c: int) -> bool:
     return ord("0") <= c <= ord("9")
 
