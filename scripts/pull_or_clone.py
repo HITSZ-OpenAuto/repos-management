@@ -2,13 +2,20 @@ import os
 import subprocess
 from pathlib import Path
 
+from dotenv import load_dotenv
 from github import Github
 
-GITHUB_TOKEN = "your_token"
-ORGANIZATION_NAME = "HITSZ-OpenAuto"
+# Load environment variables from .env file
+load_dotenv()
+
+GITHUB_TOKEN = os.getenv("PERSONAL_ACCESS_TOKEN")
+ORGANIZATION_NAME = os.getenv("ORG_NAME", "HITSZ-OpenAuto")
 TARGET_FOLDER = Path("./")
-os.environ["HTTP_PROXY"] = "http://your_proxy:port"
-os.environ["HTTPS_PROXY"] = "http://your_proxy:port"
+
+if http_proxy := os.getenv("HTTP_PROXY"):
+    os.environ["HTTP_PROXY"] = http_proxy
+if https_proxy := os.getenv("HTTPS_PROXY"):
+    os.environ["HTTPS_PROXY"] = https_proxy
 
 bypass_list = ["HITSZ-OpenAuto", "hoa-moe"]
 
