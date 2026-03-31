@@ -125,3 +125,4 @@ MECH3041
 MECH2020
 normal-course-template
 multi-project-course-template
+Cross-ECON
