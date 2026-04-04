@@ -126,3 +126,4 @@ MECH2020
 normal-course-template
 multi-project-course-template
 Cross-ECON
+Cross-Science
