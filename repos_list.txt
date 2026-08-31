@@ -147,3 +147,4 @@ MATH1005K
 PostgradElectives
 WRCO4024
 Postgrad-Control
+Postgrad-ComputerScience
