@@ -40,6 +40,8 @@ _BASE_RAW = (
     "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts"
 )
 
+# 这个链路目前不负责HOA的课程元信息处理
+# See: https://github.com/HITSZ-OpenAuto/hoa-major-data
 GRADES_SUMMARY_URL = (
     "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/"
     "grades_summary.toml"

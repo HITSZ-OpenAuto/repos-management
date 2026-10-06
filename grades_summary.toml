@@ -1,5 +1,6 @@
 # 成绩构成汇总表
-# 自动生成，请勿手动修改
+# 已停止维护，成绩构成数据以 hoa-major-data 的 grades_summary.json 为准
+# See: https://github.com/HITSZ-OpenAuto/hoa-major-data
 
 [grades.AUTO1001]
 course_name = "自动化认知与实践"
