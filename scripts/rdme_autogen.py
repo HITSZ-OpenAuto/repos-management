@@ -40,12 +40,6 @@ _BASE_RAW = (
     "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/scripts"
 )
 
-GRADES_SUMMARY_URL = (
-    "https://raw.githubusercontent.com/HITSZ-OpenAuto/repos-management/main/"
-    "grades_summary.toml"
-)
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -257,7 +251,6 @@ def main() -> int:
         tmp_dir = Path(tmp)
         conv = tmp_dir / "convert_toml_to_readme.py"
         rev_conv = tmp_dir / "readme_to_toml.py"
-        grades = tmp_dir / "grades_summary.toml"
 
         # Download forward converter (always needed)
         try:
@@ -280,12 +273,6 @@ def main() -> int:
                 rev_ok = False
                 rev_log = f"download reverse converter failed: {e}"
                 need_reverse = False  # fall back to forward only
-
-        # Best-effort: download grades summary for badge rendering.
-        try:
-            _download(GRADES_SUMMARY_URL, grades)
-        except Exception:
-            pass
 
         # --- Run reverse: README → TOML ---------------------------------
         if need_reverse and rev_ok:
