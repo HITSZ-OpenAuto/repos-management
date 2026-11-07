@@ -16,5 +16,6 @@ jobs:
       # trigger_page_build == true only when pushing to main branch
       trigger_page_build: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
-    secrets: inherit
+    secrets:
+      HOA_AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.HOA_AUTOMATION_APP_PRIVATE_KEY }}
 
