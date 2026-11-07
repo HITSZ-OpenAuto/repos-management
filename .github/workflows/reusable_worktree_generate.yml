@@ -9,8 +9,8 @@ on:
         default: false
         type: boolean
     secrets:
-      PAT:
-        description: 'Personal Access Token'
+      HOA_AUTOMATION_APP_PRIVATE_KEY:
+        description: 'Private key for the organization automation GitHub App'
         required: true
 
 concurrency:
@@ -20,18 +20,26 @@ concurrency:
 jobs:
   worktree_update:
     runs-on: ubuntu-latest
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && github.actor != 'hitsz-openauto-automation[bot]'
 
     defaults:
       run:
         shell: bash -euo pipefail {0}
 
     steps:
+      - name: Generate organization automation token
+        id: app-token
+        uses: actions/create-github-app-token@v3.3.0
+        with:
+          client-id: ${{ vars.HOA_AUTOMATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HOA_AUTOMATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.PAT }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Sync with latest main (main only)
         if: github.ref == 'refs/heads/main'
@@ -91,7 +99,7 @@ jobs:
           fi
 
           # Prevent this automated push from re-triggering workflows.
-          git commit -m "ci: sync readme and readme.toml"
+          git commit -m "ci: sync readme and readme.toml [skip ci]"
 
           # Push without rebase. If main moved meanwhile, retry once by
           # resetting to the latest main and re-running RDME.
@@ -151,7 +159,7 @@ jobs:
 
       - name: Trigger Update Repositories List workflow
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
@@ -162,7 +170,7 @@ jobs:
       - name: Trigger workflow in hoa-moe
         if: inputs.trigger_page_build
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           curl -X POST \
             -H "Accept: application/vnd.github.v3+json" \

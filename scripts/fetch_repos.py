@@ -4,9 +4,9 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-# Load the personal access token from the .env file
+# Load the GitHub App installation token from the environment or .env file.
 load_dotenv()
-PERSONAL_ACCESS_TOKEN = os.getenv("PERSONAL_ACCESS_TOKEN")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 ORG_NAME = os.getenv("ORG_NAME")
 
 
@@ -38,7 +38,7 @@ def get_repos(org_name, access_token):
 
 
 def main():
-    repos = get_repos(ORG_NAME, PERSONAL_ACCESS_TOKEN)
+    repos = get_repos(ORG_NAME, GITHUB_TOKEN)
     with Path("repos_list.txt").open("w") as f:
         f.write("\n".join(repos) + "\n")
 

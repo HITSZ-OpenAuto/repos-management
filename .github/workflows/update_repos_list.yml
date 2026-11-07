@@ -13,8 +13,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate organization automation token
+        id: app-token
+        uses: actions/create-github-app-token@v3.3.0
+        with:
+          client-id: ${{ vars.HOA_AUTOMATION_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HOA_AUTOMATION_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,7 +44,7 @@ jobs:
       - name: Update Repositories List
         run: uv run scripts/fetch_repos.py
         env:
-          PERSONAL_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           ORG_NAME: HITSZ-OpenAuto
 
       - name: Commit and Push Changes
