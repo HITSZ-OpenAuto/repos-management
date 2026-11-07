@@ -9,12 +9,9 @@ on:
         default: false
         type: boolean
     secrets:
-      PAT:
-        description: 'Legacy token accepted only while callers migrate to GitHub App authentication'
-        required: false
       HOA_AUTOMATION_APP_PRIVATE_KEY:
         description: 'Private key for the organization automation GitHub App'
-        required: false
+        required: true
 
 concurrency:
   group: rdme-worktree-generate-${{ github.repository }}-${{ github.ref }}
@@ -25,16 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor != 'github-actions[bot]' && github.actor != 'hitsz-openauto-automation[bot]'
 
-    env:
-      HAS_APP_KEY: ${{ secrets.HOA_AUTOMATION_APP_PRIVATE_KEY != '' }}
-
     defaults:
       run:
         shell: bash -euo pipefail {0}
 
     steps:
       - name: Generate organization automation token
-        if: env.HAS_APP_KEY == 'true'
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
         with:
@@ -46,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token || secrets.PAT }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Sync with latest main (main only)
         if: github.ref == 'refs/heads/main'
@@ -166,7 +159,7 @@ jobs:
 
       - name: Trigger Update Repositories List workflow
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || secrets.PAT }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           curl -X POST \
             -H "Accept: application/vnd.github+json" \
@@ -177,7 +170,7 @@ jobs:
       - name: Trigger workflow in hoa-moe
         if: inputs.trigger_page_build
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token || secrets.PAT }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           curl -X POST \
             -H "Accept: application/vnd.github.v3+json" \
